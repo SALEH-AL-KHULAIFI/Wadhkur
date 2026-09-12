@@ -45,6 +45,10 @@ public class BootReceiver extends BroadcastReceiver {
                         true
                 );
 
+        /*
+         * ReminderScheduler يقرأ الوقت المحفوظ
+         * من SharedPreferences.
+         */
         if (morningEnabled) {
 
             ReminderScheduler.scheduleMorning(
