@@ -1,3 +1,62 @@
 package com.saleh.wadhkur;
-import android.content.*;
-public class BootReceiver extends BroadcastReceiver{public void onReceive(Context c,Intent i){if(i==null||i.getAction()==null)return;String a=i.getAction();if(!Intent.ACTION_BOOT_COMPLETED.equals(a)&&!Intent.ACTION_MY_PACKAGE_REPLACED.equals(a))return;android.content.SharedPreferences p=c.getSharedPreferences("settings",Context.MODE_PRIVATE);if(!p.getBoolean("enabled",false))return;long m=Math.max(1,Math.min(60,p.getLong("minutes",30)));ReminderScheduler.schedule(c,m);}}
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+
+public class BootReceiver extends BroadcastReceiver {
+
+    @Override
+    public void onReceive(
+            Context context,
+            Intent intent
+    ) {
+
+        if (intent == null) {
+            return;
+        }
+
+        String action =
+                intent.getAction();
+
+        if (
+                !Intent.ACTION_BOOT_COMPLETED.equals(action)
+                        &&
+                !Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)
+        ) {
+            return;
+        }
+
+        android.content.SharedPreferences prefs =
+                context.getSharedPreferences(
+                        "settings",
+                        Context.MODE_PRIVATE
+                );
+
+        boolean morningEnabled =
+                prefs.getBoolean(
+                        "morning_enabled",
+                        true
+                );
+
+        boolean eveningEnabled =
+                prefs.getBoolean(
+                        "evening_enabled",
+                        true
+                );
+
+        if (morningEnabled) {
+
+            ReminderScheduler.scheduleMorning(
+                    context
+            );
+        }
+
+        if (eveningEnabled) {
+
+            ReminderScheduler.scheduleEvening(
+                    context
+            );
+        }
+    }
+}
