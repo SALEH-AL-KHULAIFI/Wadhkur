@@ -1,1 +1,40 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="96dp" android:height="96dp" android:viewportWidth="96" android:viewportHeight="96"><path android:fillColor="#050A12" android:pathData="M48,3A45,45 0,1 0,48 93A45,45 0,1 0,48 3"/><path android:fillColor="#39FF8F" android:pathData="M48,14L54,33L74,33L58,45L64,64L48,53L32,64L38,45L22,33L42,33Z"/><path android:fillColor="#37DCFF" android:pathData="M48,27A21,21 0,1 0,48 69A21,21 0,1 0,48 27M48,32A16,16 0,1 1,48 64A16,16 0,0 1,48 32"/></vector>
+<?xml version="1.0" encoding="utf-8"?>
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- الخلفية -->
+    <path
+        android:fillColor="#03070D"
+        android:pathData="M54,4A50,50 0,1 0,54 104A50,50 0,1 0,54 4" />
+
+    <!-- الإطار الخارجي -->
+    <path
+        android:fillColor="#071A21"
+        android:strokeColor="#37DCFF"
+        android:strokeWidth="2"
+        android:pathData="M54,10A44,44 0,1 0,54 98A44,44 0,1 0,54 10" />
+
+    <!-- الهلال -->
+    <path
+        android:fillColor="#39FF8F"
+        android:pathData="M61,25A29,29 0,1 0,61 83A23,23 0,1 1,61 25" />
+
+    <!-- النجمة -->
+    <path
+        android:fillColor="#37DCFF"
+        android:pathData="M72,22L75.5,32L86,32L77.5,38L81,48L72,42L63,48L66.5,38L58,32L68.5,32Z" />
+
+    <!-- زخرفة هندسية -->
+    <path
+        android:fillColor="#39FF8F"
+        android:pathData="M54,76L58,80L54,84L50,80Z" />
+
+    <path
+        android:fillColor="#37DCFF"
+        android:pathData="M42,76L45,79L42,82L39,79Z" />
+
+</vector>
