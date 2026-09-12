@@ -2484,6 +2484,13 @@ public class MainActivity extends Activity {
      */
     private void prayerTimes() {
 
+        /*
+         * نحاول أولًا الحصول على آخر موقع معروف.
+         * هذا مهم خصوصًا إذا كان المستخدم قد منح
+         * الإذن سابقًا لكن لم تُحفظ الإحداثيات.
+         */
+        loadLastKnownLocation();
+
         double latitude =
                 prefs.getFloat(
                         LATITUDE,
@@ -2506,7 +2513,7 @@ public class MainActivity extends Activity {
                             "📍 الموقع مطلوب"
                     )
                     .setMessage(
-                            "يحتاج التطبيق إلى موقع الهاتف لحساب مواقيت الصلاة محليًا. يمكنك السماح بالموقع ثم إعادة فتح هذه الصفحة."
+                            "يحتاج التطبيق إلى موقع الهاتف لحساب مواقيت الصلاة محليًا. اسمح بالوصول إلى الموقع ثم افتح مواقيت الصلاة مرة أخرى."
                     )
                     .setPositiveButton(
                             "السماح بالموقع",
@@ -2901,7 +2908,21 @@ public class MainActivity extends Activity {
     }
 
     /*
+     * ============================================================
      * حساب مواقيت الصلاة محليًا
+     * ============================================================
+     *
+     * الحساب يعتمد على:
+     * - خط العرض
+     * - خط الطول
+     * - اليوم الحالي
+     * - المنطقة الزمنية المحلية للهاتف
+     *
+     * الزوايا:
+     * الفجر  = 18°
+     * العشاء = 17°
+     * الشروق/الغروب = -0.833°
+     * العصر = معيار الظل 1
      */
     private PrayerTimes calculatePrayerTimes(
             double latitude,
@@ -2914,10 +2935,16 @@ public class MainActivity extends Activity {
                         Calendar.DAY_OF_YEAR
                 );
 
+        /*
+         * زاوية اليوم الشمسية
+         */
         double gamma =
                 2.0 * Math.PI / 365.0 *
                         (dayOfYear - 1);
 
+        /*
+         * معادلة الزمن بالدقائق
+         */
         double equationOfTime =
                 229.18 *
                         (
@@ -2930,12 +2957,15 @@ public class MainActivity extends Activity {
                                         Math.sin(gamma)
                                         -
                                 0.014615 *
-                                        Math.cos(2 * gamma)
+                                        Math.cos(2.0 * gamma)
                                         -
                                 0.040849 *
-                                        Math.sin(2 * gamma)
+                                        Math.sin(2.0 * gamma)
                         );
 
+        /*
+         * ميل الشمس بالراديان
+         */
         double declination =
                 0.006918
                         -
@@ -2946,61 +2976,72 @@ public class MainActivity extends Activity {
                         Math.sin(gamma)
                         -
                 0.006758 *
-                        Math.cos(2 * gamma)
+                        Math.cos(2.0 * gamma)
                         +
                 0.000907 *
-                        Math.sin(2 * gamma)
+                        Math.sin(2.0 * gamma)
                         -
                 0.002697 *
-                        Math.cos(3 * gamma)
+                        Math.cos(3.0 * gamma)
                         +
-                0.00148 *
-                        Math.sin(3 * gamma);
+                0.001480 *
+                        Math.sin(3.0 * gamma);
 
+        /*
+         * المنطقة الزمنية المحلية للهاتف
+         */
         double timezone =
                 TimeZoneHolder.offsetHours();
 
+        /*
+         * الظهر الشمسي
+         */
         double solarNoon =
                 720.0
                         -
-                4.0 * longitude
+                (4.0 * longitude)
                         -
                 equationOfTime
                         +
-                60.0 * timezone;
+                (60.0 * timezone);
 
-        double sunrise =
-                solarTime(
-                        solarNoon,
-                        latitude,
-                        declination,
-                        -0.833
-                );
+        /*
+         * زاوية الشروق والغروب
+         *
+         * -0.833 درجة تشمل تقريبًا:
+         * انكسار الغلاف الجوي + نصف قطر قرص الشمس.
+         */
+        double sunriseSunsetAngle =
+                -0.833;
 
-        double sunset =
-                solarTime(
-                        solarNoon,
-                        latitude,
-                        declination,
-                        -0.833
-                );
-
-        double sunriseOffset =
+        double sunriseHourAngle =
                 hourAngle(
                         latitude,
                         declination,
-                        -0.833
+                        sunriseSunsetAngle
                 );
 
-        double sunsetTime =
-                solarNoon +
-                        4.0 * sunsetOffset;
-
+        /*
+         * الشروق
+         */
         double sunriseTime =
-                solarNoon -
-                        4.0 * sunriseOffset;
+                solarNoon
+                        -
+                (4.0 * sunriseHourAngle);
 
-        double fajrAngle =
+        /*
+         * الغروب
+         */
+        double sunsetTime =
+                solarNoon
+                        +
+                (4.0 * sunriseHourAngle);
+
+        /*
+         * الفجر
+         * زاوية الشمس -18°
+         */
+        double fajrHourAngle =
                 hourAngle(
                         latitude,
                         declination,
@@ -3008,10 +3049,15 @@ public class MainActivity extends Activity {
                 );
 
         double fajrTime =
-                solarNoon -
-                        4.0 * fajrAngle;
+                solarNoon
+                        -
+                (4.0 * fajrHourAngle);
 
-        double ishaAngle =
+        /*
+         * العشاء
+         * زاوية الشمس -17°
+         */
+        double ishaHourAngle =
                 hourAngle(
                         latitude,
                         declination,
@@ -3019,9 +3065,16 @@ public class MainActivity extends Activity {
                 );
 
         double ishaTime =
-                solarNoon +
-                        4.0 * ishaAngle;
+                solarNoon
+                        +
+                (4.0 * ishaHourAngle);
 
+        /*
+         * العصر
+         *
+         * معيار الظل 1:
+         * طول ظل الجسم = طول الجسم نفسه
+         */
         double asrTime =
                 calculateAsr(
                         solarNoon,
@@ -3030,6 +3083,9 @@ public class MainActivity extends Activity {
                         1
                 );
 
+        /*
+         * إنشاء النتيجة
+         */
         PrayerTimes result =
                 new PrayerTimes();
 
@@ -3067,27 +3123,31 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * وقت الشمس لزاوية معينة
+     * حساب وقت الشمس عند زاوية معينة
      */
     private double solarTime(
             double solarNoon,
             double latitude,
             double declination,
-            double angle
+            double solarAltitude
     ) {
 
         double h =
                 hourAngle(
                         latitude,
                         declination,
-                        angle
+                        solarAltitude
                 );
 
-        return solarNoon + 4.0 * h;
+        return solarNoon +
+                (4.0 * h);
     }
 
     /*
-     * زاوية الساعة
+     * حساب زاوية الساعة
+     *
+     * النتيجة بالدرجات.
+     * كل درجة تعادل 4 دقائق.
      */
     private double hourAngle(
             double latitude,
@@ -3105,37 +3165,86 @@ public class MainActivity extends Activity {
                         solarAltitude
                 );
 
-        double cosH =
-                (
-                        Math.sin(altitudeRad)
-                                -
-                        Math.sin(latRad)
-                                *
-                        Math.sin(declination)
-                )
-                        /
-                        (
-                                Math.cos(latRad)
-                                        *
-                                Math.cos(declination)
-                        );
+        double sinLat =
+                Math.sin(
+                        latRad
+                );
 
-        if (cosH > 1.0) {
-            return 180.0;
-        }
+        double cosLat =
+                Math.cos(
+                        latRad
+                );
 
-        if (cosH < -1.0) {
+        double sinDeclination =
+                Math.sin(
+                        declination
+                );
+
+        double cosDeclination =
+                Math.cos(
+                        declination
+                );
+
+        double sinAltitude =
+                Math.sin(
+                        altitudeRad
+                );
+
+        /*
+         * معادلة زاوية الساعة:
+         *
+         * cos(H) =
+         * (sin(h) - sin(phi)sin(delta))
+         * /
+         * (cos(phi)cos(delta))
+         */
+        double denominator =
+                cosLat *
+                        cosDeclination;
+
+        /*
+         * حماية من القسمة على صفر
+         */
+        if (Math.abs(denominator) < 0.000001) {
+
             return 0.0;
         }
 
+        double cosH =
+                (
+                        sinAltitude
+                                -
+                        (sinLat *
+                                sinDeclination)
+                )
+                        /
+                        denominator;
+
+        /*
+         * منع أخطاء acos الناتجة عن
+         * قيم بسيطة خارج النطاق بسبب التقريب.
+         */
+        if (cosH > 1.0) {
+
+            cosH = 1.0;
+
+        } else if (cosH < -1.0) {
+
+            cosH = -1.0;
+        }
+
         return Math.toDegrees(
-                Math.acos(cosH)
+                Math.acos(
+                        cosH
+                )
         );
     }
 
     /*
      * حساب العصر
+     *
      * shadowFactor = 1
+     * يعني معيار الظل الأول.
      */
     private double calculateAsr(
             double solarNoon,
@@ -3149,6 +3258,12 @@ public class MainActivity extends Activity {
                         latitude
                 );
 
+        /*
+         * زاوية ارتفاع الشمس المطلوبة للعصر.
+         *
+         * معيار الظل:
+         * 1 = ظل الجسم يساوي طول الجسم
+         */
         double altitude =
                 -Math.toDegrees(
                         Math.atan(
@@ -3173,32 +3288,49 @@ public class MainActivity extends Activity {
                 );
 
         return solarNoon +
-                4.0 * h;
+                (4.0 * h);
     }
 
     /*
-     * تحويل الدقائق إلى وقت
+     * تحويل الدقائق الفلكية إلى وقت
      */
     private String formatPrayerTime(
             double minutes
     ) {
 
-        while (minutes < 0) {
-            minutes += 1440;
+        if (Double.isNaN(minutes) ||
+                Double.isInfinite(minutes)) {
+
+            return "--:--";
         }
 
-        while (minutes >= 1440) {
-            minutes -= 1440;
+        /*
+         * تطبيع الوقت إلى 24 ساعة.
+         */
+        while (minutes < 0.0) {
+
+            minutes += 1440.0;
+        }
+
+        while (minutes >= 1440.0) {
+
+            minutes -= 1440.0;
         }
 
         int hour =
-                (int) (minutes / 60);
+                (int) (
+                        minutes / 60.0
+                );
 
         int minute =
                 (int) Math.round(
-                        minutes % 60
+                        minutes % 60.0
                 );
 
+        /*
+         * معالجة حالة التقريب:
+         * 12:59.8 -> 13:00
+         */
         if (minute >= 60) {
 
             minute = 0;
@@ -3237,6 +3369,10 @@ public class MainActivity extends Activity {
         }
     }
 
+    /*
+     * الحصول على فرق المنطقة الزمنية
+     * من إعدادات الهاتف.
+     */
     private static class TimeZoneOffset {
 
         static double get() {
