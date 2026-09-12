@@ -9,7 +9,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
@@ -17,7 +16,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -46,6 +44,7 @@ public class MainActivity extends Activity {
     private static final int WHITE = Color.rgb(239, 250, 245);
     private static final int MUTED = Color.rgb(150, 170, 182);
     private static final int RED = Color.rgb(255, 85, 105);
+
     private static final int LOCATION_REQUEST_CODE = 501;
     private static final int NOTIFICATION_REQUEST_CODE = 502;
 
@@ -3162,6 +3161,7 @@ public class MainActivity extends Activity {
                                                                 latRad
                                                         )
                                                 )
+                                        )
                         )
                 );
 
@@ -3648,4 +3648,4 @@ public class MainActivity extends Activity {
                 new Date()
         );
     }
-}
+            }
