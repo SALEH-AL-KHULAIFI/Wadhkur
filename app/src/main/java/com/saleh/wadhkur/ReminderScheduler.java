@@ -4,32 +4,101 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 
 import java.util.Calendar;
 
 public final class ReminderScheduler {
 
+    public static final String TYPE_GENERAL = "general";
     public static final String TYPE_MORNING = "morning";
     public static final String TYPE_EVENING = "evening";
 
+    private static final String PREFS = "settings";
+
+    private static final int GENERAL_REQUEST_CODE = 7700;
     private static final int MORNING_REQUEST_CODE = 7701;
     private static final int EVENING_REQUEST_CODE = 7702;
 
     private ReminderScheduler() {
     }
 
+    /*
+     * جدولة جميع التذكيرات المفعلة
+     */
     public static void scheduleAll(Context context) {
 
-        scheduleMorning(context);
-        scheduleEvening(context);
+        SharedPreferences prefs =
+                context.getSharedPreferences(
+                        PREFS,
+                        Context.MODE_PRIVATE
+                );
+
+        if (prefs.getBoolean(
+                "general_enabled",
+                true
+        )) {
+
+            scheduleGeneral(context);
+        }
+
+        if (prefs.getBoolean(
+                "morning_enabled",
+                true
+        )) {
+
+            scheduleMorning(context);
+        }
+
+        if (prefs.getBoolean(
+                "evening_enabled",
+                true
+        )) {
+
+            scheduleEvening(context);
+        }
     }
 
+    /*
+     * التذكير العام
+     */
+    public static void scheduleGeneral(Context context) {
+
+        SharedPreferences prefs =
+                context.getSharedPreferences(
+                        PREFS,
+                        Context.MODE_PRIVATE
+                );
+
+        int hour =
+                prefs.getInt(
+                        "general_hour",
+                        12
+                );
+
+        int minute =
+                prefs.getInt(
+                        "general_minute",
+                        0
+                );
+
+        schedule(
+                context,
+                TYPE_GENERAL,
+                hour,
+                minute
+        );
+    }
+
+    /*
+     * تذكير أذكار الصباح
+     */
     public static void scheduleMorning(Context context) {
 
-        android.content.SharedPreferences prefs =
+        SharedPreferences prefs =
                 context.getSharedPreferences(
-                        "settings",
+                        PREFS,
                         Context.MODE_PRIVATE
                 );
 
@@ -53,11 +122,14 @@ public final class ReminderScheduler {
         );
     }
 
+    /*
+     * تذكير أذكار المساء
+     */
     public static void scheduleEvening(Context context) {
 
-        android.content.SharedPreferences prefs =
+        SharedPreferences prefs =
                 context.getSharedPreferences(
-                        "settings",
+                        PREFS,
                         Context.MODE_PRIVATE
                 );
 
@@ -81,6 +153,9 @@ public final class ReminderScheduler {
         );
     }
 
+    /*
+     * جدولة تنبيه يومي
+     */
     public static void schedule(
             Context context,
             String type,
@@ -98,9 +173,7 @@ public final class ReminderScheduler {
         }
 
         int requestCode =
-                TYPE_MORNING.equals(type)
-                        ? MORNING_REQUEST_CODE
-                        : EVENING_REQUEST_CODE;
+                getRequestCode(type);
 
         Intent intent =
                 new Intent(
@@ -149,6 +222,10 @@ public final class ReminderScheduler {
                 0
         );
 
+        /*
+         * إذا مر وقت التنبيه اليوم،
+         * نضعه في اليوم التالي.
+         */
         if (next.getTimeInMillis()
                 <= System.currentTimeMillis()) {
 
@@ -161,6 +238,14 @@ public final class ReminderScheduler {
         long trigger =
                 next.getTimeInMillis();
 
+        /*
+         * لا نستخدم Exact Alarm هنا حتى لا نحتاج
+         * إلى إضافة SCHEDULE_EXACT_ALARM في هذه المرحلة.
+         *
+         * setAndAllowWhileIdle مناسب لتذكيرات يومية
+         * ويعمل أثناء وضع توفير الطاقة مع السماح
+         * للنظام بهامش بسيط في وقت التنفيذ.
+         */
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 
             alarmManager.setAndAllowWhileIdle(
@@ -179,6 +264,23 @@ public final class ReminderScheduler {
         }
     }
 
+    /*
+     * إلغاء التذكير العام
+     */
+    public static void cancelGeneral(
+            Context context
+    ) {
+
+        cancel(
+                context,
+                TYPE_GENERAL,
+                GENERAL_REQUEST_CODE
+        );
+    }
+
+    /*
+     * إلغاء تذكير الصباح
+     */
     public static void cancelMorning(
             Context context
     ) {
@@ -190,6 +292,9 @@ public final class ReminderScheduler {
         );
     }
 
+    /*
+     * إلغاء تذكير المساء
+     */
     public static void cancelEvening(
             Context context
     ) {
@@ -201,14 +306,21 @@ public final class ReminderScheduler {
         );
     }
 
+    /*
+     * إلغاء جميع التذكيرات
+     */
     public static void cancelAll(
             Context context
     ) {
 
+        cancelGeneral(context);
         cancelMorning(context);
         cancelEvening(context);
     }
 
+    /*
+     * إلغاء تنبيه محدد
+     */
     private static void cancel(
             Context context,
             String type,
@@ -234,6 +346,11 @@ public final class ReminderScheduler {
                 "com.saleh.wadhkur.REMINDER_" + type
         );
 
+        intent.putExtra(
+                ReminderReceiver.EXTRA_TYPE,
+                type
+        );
+
         PendingIntent pendingIntent =
                 PendingIntent.getBroadcast(
                         context,
@@ -248,5 +365,33 @@ public final class ReminderScheduler {
         );
 
         pendingIntent.cancel();
+    }
+
+    /*
+     * الحصول على Request Code حسب نوع التذكير
+     */
+    private static int getRequestCode(
+            String type
+    ) {
+
+        if (TYPE_GENERAL.equals(type)) {
+
+            return GENERAL_REQUEST_CODE;
+        }
+
+        if (TYPE_MORNING.equals(type)) {
+
+            return MORNING_REQUEST_CODE;
+        }
+
+        if (TYPE_EVENING.equals(type)) {
+
+            return EVENING_REQUEST_CODE;
+        }
+
+        /*
+         * حماية من أي نوع غير معروف.
+         */
+        return GENERAL_REQUEST_CODE;
     }
 }
