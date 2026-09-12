@@ -3,7 +3,7 @@
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- إشعارات أذكار الصباح والمساء -->
+    <!-- إشعارات التطبيق -->
     <uses-permission
         android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -14,6 +14,13 @@
     <!-- الاهتزاز مع الإشعارات -->
     <uses-permission
         android:name="android.permission.VIBRATE" />
+
+    <!-- الموقع لحساب مواقيت الصلاة محليًا -->
+    <uses-permission
+        android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION" />
 
 
     <application
@@ -52,7 +59,7 @@
         </activity>
 
 
-        <!-- استقبال تنبيه أذكار الصباح والمساء -->
+        <!-- استقبال جميع أنواع تذكيرات وذكر -->
         <receiver
 
             android:name=".ReminderReceiver"
