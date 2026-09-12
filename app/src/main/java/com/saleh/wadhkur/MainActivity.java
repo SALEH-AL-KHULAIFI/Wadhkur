@@ -110,11 +110,6 @@ public class MainActivity extends Activity {
      */
     private void showHome() {
 
-        /*
-         * مهم جدًا:
-         * عند الرجوع للرئيسية لا تبقى المجموعة السابقة
-         * فعالة حتى لا يتعارض زر الرجوع.
-         */
         currentData = null;
         currentTitle = null;
         currentIndex = 0;
@@ -212,7 +207,6 @@ public class MainActivity extends Activity {
 
         if (!(scrollView.getChildAt(0)
                 instanceof LinearLayout)) {
-
             return;
         }
 
@@ -313,9 +307,6 @@ public class MainActivity extends Activity {
 
         ramadanCard.addView(note);
 
-        /*
-         * يوضع العداد بعد الهيدر مباشرة.
-         */
         root.addView(
                 ramadanCard,
                 1
@@ -421,7 +412,6 @@ public class MainActivity extends Activity {
 
         if (!(scrollView.getChildAt(0)
                 instanceof LinearLayout)) {
-
             return;
         }
 
@@ -476,26 +466,21 @@ public class MainActivity extends Activity {
     private void confirmExit() {
 
         new AlertDialog.Builder(this)
-
                 .setTitle(
                         "الخروج من وذكر"
                 )
-
                 .setMessage(
                         "هل تريد إغلاق التطبيق؟"
                 )
-
                 .setPositiveButton(
                         "خروج",
                         (dialog, which) ->
                                 finishAffinity()
                 )
-
                 .setNegativeButton(
                         "إلغاء",
                         null
                 )
-
                 .show();
     }
 
@@ -572,7 +557,6 @@ public class MainActivity extends Activity {
 
     /*
      * شاشة مجموعة الأذكار
-     *
      * بطاقة واحدة فقط في كل مرة.
      */
     private void section(
@@ -608,7 +592,7 @@ public class MainActivity extends Activity {
         );
 
         /*
-         * HEADER
+         * رأس الصفحة
          */
         LinearLayout header =
                 new LinearLayout(this);
@@ -689,7 +673,7 @@ public class MainActivity extends Activity {
         root.addView(header);
 
         /*
-         * تعليمات
+         * التعليمات
          */
         TextView instruction =
                 label(
@@ -741,8 +725,7 @@ public class MainActivity extends Activity {
         FrameLayout cardContainer =
                 new FrameLayout(this);
 
-        LinearLayout.LayoutParams
-                containerParams =
+        LinearLayout.LayoutParams containerParams =
                 new LinearLayout.LayoutParams(
                         -1,
                         0,
@@ -907,7 +890,6 @@ public class MainActivity extends Activity {
             if (currentIndex > 0) {
 
                 currentIndex--;
-
                 currentRepeat = 0;
 
                 showCurrentDhikr(
@@ -938,7 +920,6 @@ public class MainActivity extends Activity {
                     currentData.length - 1) {
 
                 currentIndex++;
-
                 currentRepeat = 0;
 
                 showCurrentDhikr(
@@ -961,11 +942,7 @@ public class MainActivity extends Activity {
         });
 
         /*
-         * السحب الأفقي.
-         *
-         * نسمح بالتمرير العمودي داخل البطاقة،
-         * ولا نغيّر الذكر إلا عند وجود حركة
-         * أفقية واضحة.
+         * السحب الأفقي
          */
         cardContainer.setOnTouchListener(
                 (v, event) -> {
@@ -977,7 +954,7 @@ public class MainActivity extends Activity {
                             downX = event.getX();
                             downY = event.getY();
 
-                            return false;
+                            return true;
 
                         case MotionEvent.ACTION_UP:
 
@@ -998,7 +975,6 @@ public class MainActivity extends Activity {
                                             currentData.length - 1) {
 
                                         currentIndex++;
-
                                         currentRepeat = 0;
 
                                         showCurrentDhikr(
@@ -1010,6 +986,13 @@ public class MainActivity extends Activity {
                                                 0
                                         );
 
+                                    } else {
+
+                                        Toast.makeText(
+                                                this,
+                                                "هذا آخر ذكر",
+                                                Toast.LENGTH_SHORT
+                                        ).show();
                                     }
 
                                 } else {
@@ -1017,7 +1000,6 @@ public class MainActivity extends Activity {
                                     if (currentIndex > 0) {
 
                                         currentIndex--;
-
                                         currentRepeat = 0;
 
                                         showCurrentDhikr(
@@ -1028,16 +1010,28 @@ public class MainActivity extends Activity {
                                                 0,
                                                 0
                                         );
+
+                                    } else {
+
+                                        Toast.makeText(
+                                                this,
+                                                "هذا أول ذكر",
+                                                Toast.LENGTH_SHORT
+                                        ).show();
                                     }
                                 }
 
                                 return true;
                             }
 
-                            return false;
+                            return true;
+
+                        case MotionEvent.ACTION_CANCEL:
+
+                            return true;
                     }
 
-                    return false;
+                    return true;
                 }
         );
 
@@ -1104,8 +1098,7 @@ public class MainActivity extends Activity {
                 dp(8)
         );
 
-        LinearLayout.LayoutParams
-                cardParams =
+        LinearLayout.LayoutParams cardParams =
                 new LinearLayout.LayoutParams(
                         -1,
                         -2
@@ -1127,9 +1120,11 @@ public class MainActivity extends Activity {
          */
         dhikrTitleText =
                 label(
-                        "✦  الذكر  ✦",
+                        "✦  " +
+                                dhikr.title +
+                                "  ✦",
                         GREEN,
-                        17,
+                        19,
                         true
                 );
 
@@ -1173,7 +1168,7 @@ public class MainActivity extends Activity {
         );
 
         /*
-         * المصدر إن وجد
+         * المصدر
          */
         if (dhikr.source != null &&
                 !dhikr.source.trim().isEmpty()) {
@@ -1204,11 +1199,13 @@ public class MainActivity extends Activity {
 
         /*
          * عداد التكرار
+         *
+         * DhikrData يستخدم count وليس repeat.
          */
         int targetRepeat =
                 Math.max(
                         1,
-                        dhikr.repeat
+                        dhikr.count
                 );
 
         dhikrCounterText =
@@ -1263,8 +1260,7 @@ public class MainActivity extends Activity {
                 R.drawable.neon_button
         );
 
-        LinearLayout.LayoutParams
-                actionParams =
+        LinearLayout.LayoutParams actionParams =
                 new LinearLayout.LayoutParams(
                         -1,
                         dp(56)
@@ -1389,8 +1385,7 @@ public class MainActivity extends Activity {
                 Gravity.CENTER
         );
 
-        LinearLayout.LayoutParams
-                countParams =
+        LinearLayout.LayoutParams countParams =
                 new LinearLayout.LayoutParams(
                         -1,
                         0,
@@ -1461,8 +1456,7 @@ public class MainActivity extends Activity {
                 R.drawable.card_bg
         );
 
-        LinearLayout.LayoutParams
-                resetParams =
+        LinearLayout.LayoutParams resetParams =
                 new LinearLayout.LayoutParams(
                         -1,
                         dp(52)
@@ -1893,7 +1887,6 @@ public class MainActivity extends Activity {
                 );
 
         if (!today.equals(savedDate)) {
-
             count = 0;
         }
 
