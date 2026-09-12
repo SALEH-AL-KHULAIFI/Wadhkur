@@ -9,18 +9,20 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.InputType;
+import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -44,17 +46,26 @@ public class MainActivity extends Activity {
     private static final int WHITE = Color.rgb(239, 250, 245);
     private static final int MUTED = Color.rgb(150, 170, 182);
     private static final int RED = Color.rgb(255, 85, 105);
+    private static final int LOCATION_REQUEST_CODE = 501;
+    private static final int NOTIFICATION_REQUEST_CODE = 502;
 
     private static final String PREFS = "settings";
 
+    private static final String GENERAL_ENABLED = "general_enabled";
     private static final String MORNING_ENABLED = "morning_enabled";
     private static final String EVENING_ENABLED = "evening_enabled";
+
+    private static final String GENERAL_HOUR = "general_hour";
+    private static final String GENERAL_MINUTE = "general_minute";
 
     private static final String MORNING_HOUR = "morning_hour";
     private static final String MORNING_MINUTE = "morning_minute";
 
     private static final String EVENING_HOUR = "evening_hour";
     private static final String EVENING_MINUTE = "evening_minute";
+
+    private static final String LATITUDE = "prayer_latitude";
+    private static final String LONGITUDE = "prayer_longitude";
 
     private SharedPreferences prefs;
 
@@ -113,11 +124,15 @@ public class MainActivity extends Activity {
 
         showHome();
 
-        handleNotificationIntent(getIntent());
+        handleNotificationIntent(
+                getIntent()
+        );
 
         requestNotificationPermissionIfNeeded();
 
         scheduleEnabledReminders();
+
+        requestLocationPermissionIfNeeded();
     }
 
     @Override
@@ -127,7 +142,20 @@ public class MainActivity extends Activity {
 
         setIntent(intent);
 
-        handleNotificationIntent(intent);
+        handleNotificationIntent(
+                intent
+        );
+    }
+
+    @Override
+    protected void onResume() {
+
+        super.onResume();
+
+        if (prefs != null) {
+
+            scheduleEnabledReminders();
+        }
     }
 
     @Override
@@ -141,57 +169,98 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * القيم الافتراضية للتنبيهات
+     * الإعدادات الافتراضية
      */
     private void initializeReminderDefaults() {
 
+        SharedPreferences.Editor editor =
+                prefs.edit();
+
+        boolean changed = false;
+
+        if (!prefs.contains(GENERAL_ENABLED)) {
+
+            editor.putBoolean(
+                    GENERAL_ENABLED,
+                    true
+            );
+
+            changed = true;
+        }
+
         if (!prefs.contains(MORNING_ENABLED)) {
-            prefs.edit()
-                    .putBoolean(
-                            MORNING_ENABLED,
-                            true
-                    )
-                    .apply();
+
+            editor.putBoolean(
+                    MORNING_ENABLED,
+                    true
+            );
+
+            changed = true;
         }
 
         if (!prefs.contains(EVENING_ENABLED)) {
-            prefs.edit()
-                    .putBoolean(
-                            EVENING_ENABLED,
-                            true
-                    )
-                    .apply();
+
+            editor.putBoolean(
+                    EVENING_ENABLED,
+                    true
+            );
+
+            changed = true;
+        }
+
+        if (!prefs.contains(GENERAL_HOUR)) {
+
+            editor.putInt(
+                    GENERAL_HOUR,
+                    12
+            );
+
+            editor.putInt(
+                    GENERAL_MINUTE,
+                    0
+            );
+
+            changed = true;
         }
 
         if (!prefs.contains(MORNING_HOUR)) {
-            prefs.edit()
-                    .putInt(
-                            MORNING_HOUR,
-                            6
-                    )
-                    .putInt(
-                            MORNING_MINUTE,
-                            0
-                    )
-                    .apply();
+
+            editor.putInt(
+                    MORNING_HOUR,
+                    6
+            );
+
+            editor.putInt(
+                    MORNING_MINUTE,
+                    0
+            );
+
+            changed = true;
         }
 
         if (!prefs.contains(EVENING_HOUR)) {
-            prefs.edit()
-                    .putInt(
-                            EVENING_HOUR,
-                            17
-                    )
-                    .putInt(
-                            EVENING_MINUTE,
-                            0
-                    )
-                    .apply();
+
+            editor.putInt(
+                    EVENING_HOUR,
+                    17
+            );
+
+            editor.putInt(
+                    EVENING_MINUTE,
+                    0
+            );
+
+            changed = true;
+        }
+
+        if (changed) {
+
+            editor.apply();
         }
     }
 
     /*
-     * طلب إذن الإشعارات
+     * إذن الإشعارات
      */
     private void requestNotificationPermissionIfNeeded() {
 
@@ -205,60 +274,114 @@ public class MainActivity extends Activity {
                         new String[]{
                                 Manifest.permission.POST_NOTIFICATIONS
                         },
-                        44
+                        NOTIFICATION_REQUEST_CODE
                 );
             }
         }
     }
 
     /*
-     * تشغيل التنبيهات المفعلة
+     * إذن الموقع
      */
-    private void scheduleEnabledReminders() {
+    private void requestLocationPermissionIfNeeded() {
 
-        if (prefs.getBoolean(
-                MORNING_ENABLED,
-                true
-        )) {
+        if (Build.VERSION.SDK_INT < 23) {
 
-            ReminderScheduler.schedule(
-                    this,
-                    ReminderScheduler.TYPE_MORNING,
-                    prefs.getInt(
-                            MORNING_HOUR,
-                            6
-                    ),
-                    prefs.getInt(
-                            MORNING_MINUTE,
-                            0
-                    )
-            );
+            loadLastKnownLocation();
+
+            return;
         }
 
-        if (prefs.getBoolean(
-                EVENING_ENABLED,
-                true
-        )) {
+        boolean fine =
+                checkSelfPermission(
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED;
 
-            ReminderScheduler.schedule(
-                    this,
-                    ReminderScheduler.TYPE_EVENING,
-                    prefs.getInt(
-                            EVENING_HOUR,
-                            17
-                    ),
-                    prefs.getInt(
-                            EVENING_MINUTE,
-                            0
-                    )
-            );
+        boolean coarse =
+                checkSelfPermission(
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED;
+
+        if (fine || coarse) {
+
+            loadLastKnownLocation();
+
+            return;
+        }
+
+        requestPermissions(
+                new String[]{
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                },
+                LOCATION_REQUEST_CODE
+        );
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode,
+            String[] permissions,
+            int[] grantResults
+    ) {
+
+        super.onRequestPermissionsResult(
+                requestCode,
+                permissions,
+                grantResults
+        );
+
+        if (requestCode == LOCATION_REQUEST_CODE) {
+
+            boolean granted = false;
+
+            for (int result : grantResults) {
+
+                if (result ==
+                        PackageManager.PERMISSION_GRANTED) {
+
+                    granted = true;
+                    break;
+                }
+            }
+
+            if (granted) {
+
+                loadLastKnownLocation();
+
+                Toast.makeText(
+                        this,
+                        "تم السماح بالموقع لحساب مواقيت الصلاة",
+                        Toast.LENGTH_SHORT
+                ).show();
+
+            } else {
+
+                Toast.makeText(
+                        this,
+                        "لم يتم السماح بالموقع، ويمكنك تفعيله من الإعدادات",
+                        Toast.LENGTH_LONG
+                ).show();
+            }
         }
     }
 
     /*
-     * التعامل مع الضغط على إشعار
+     * جدولة جميع التنبيهات المفعلة
      */
-    private void handleNotificationIntent(Intent intent) {
+    private void scheduleEnabledReminders() {
+
+        ReminderScheduler.scheduleAll(
+                this
+        );
+    }
+
+    /*
+     * التعامل مع الإشعار
+     */
+    private void handleNotificationIntent(
+            Intent intent
+    ) {
 
         if (intent == null) {
             return;
@@ -285,10 +408,68 @@ public class MainActivity extends Activity {
         ) {
 
             section(
-                    "🌆 أذكار المساء",
+                    "🌙 أذكار المساء",
                     DhikrData.EVENING
             );
+
+        } else if (
+                ReminderScheduler.TYPE_GENERAL.equals(section)
+        ) {
+
+            DhikrData.Dhikr[] data =
+                    getGeneralDhikrData();
+
+            section(
+                    "🔔 التذكير العام",
+                    data
+            );
         }
+    }
+
+    /*
+     * بيانات التذكير العام
+     *
+     * نستخدم الأذكار الموجودة أصلًا في التطبيق
+     * حتى يكون كل إشعار ذكرًا كاملًا.
+     */
+    private DhikrData.Dhikr[] getGeneralDhikrData() {
+
+        int morningLength =
+                DhikrData.MORNING == null
+                        ? 0
+                        : DhikrData.MORNING.length;
+
+        int eveningLength =
+                DhikrData.EVENING == null
+                        ? 0
+                        : DhikrData.EVENING.length;
+
+        DhikrData.Dhikr[] result =
+                new DhikrData.Dhikr[
+                        morningLength + eveningLength
+                ];
+
+        int index = 0;
+
+        if (DhikrData.MORNING != null) {
+
+            for (DhikrData.Dhikr item :
+                    DhikrData.MORNING) {
+
+                result[index++] = item;
+            }
+        }
+
+        if (DhikrData.EVENING != null) {
+
+            for (DhikrData.Dhikr item :
+                    DhikrData.EVENING) {
+
+                result[index++] = item;
+            }
+        }
+
+        return result;
     }
 
     /*
@@ -305,13 +486,15 @@ public class MainActivity extends Activity {
                 R.layout.activity_main
         );
 
-        countText = findViewById(
-                R.id.countText
-        );
+        countText =
+                findViewById(
+                        R.id.countText
+                );
 
-        statusText = findViewById(
-                R.id.statusText
-        );
+        statusText =
+                findViewById(
+                        R.id.statusText
+                );
 
         View morning =
                 findViewById(
@@ -337,7 +520,7 @@ public class MainActivity extends Activity {
 
             evening.setOnClickListener(
                     v -> section(
-                            "🌆 أذكار المساء",
+                            "🌙 أذكار المساء",
                             DhikrData.EVENING
                     )
             );
@@ -622,7 +805,7 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * تحديث الحصيلة وحالة التنبيهات
+     * تحديث الصفحة الرئيسية
      */
     private void refresh() {
 
@@ -662,6 +845,12 @@ public class MainActivity extends Activity {
                 )
         );
 
+        boolean general =
+                prefs.getBoolean(
+                        GENERAL_ENABLED,
+                        true
+                );
+
         boolean morning =
                 prefs.getBoolean(
                         MORNING_ENABLED,
@@ -674,30 +863,36 @@ public class MainActivity extends Activity {
                         true
                 );
 
-        if (morning && evening) {
+        int enabledCount = 0;
+
+        if (general) {
+            enabledCount++;
+        }
+
+        if (morning) {
+            enabledCount++;
+        }
+
+        if (evening) {
+            enabledCount++;
+        }
+
+        if (enabledCount == 3) {
 
             statusText.setText(
-                    "🟢 تذكيرات الصباح والمساء مفعلة"
+                    "🟢 جميع التذكيرات مفعلة"
             );
 
             statusText.setTextColor(
                     GREEN
             );
 
-        } else if (morning) {
+        } else if (enabledCount > 0) {
 
             statusText.setText(
-                    "🟢 تذكير أذكار الصباح مفعّل"
-            );
-
-            statusText.setTextColor(
-                    GREEN
-            );
-
-        } else if (evening) {
-
-            statusText.setText(
-                    "🟢 تذكير أذكار المساء مفعّل"
+                    "🟢 التذكيرات المفعلة: " +
+                            enabledCount +
+                            " من 3"
             );
 
             statusText.setTextColor(
@@ -707,7 +902,7 @@ public class MainActivity extends Activity {
         } else {
 
             statusText.setText(
-                    "⚪ تذكيرات الأذكار متوقفة"
+                    "⚪ جميع التذكيرات متوقفة"
             );
 
             statusText.setTextColor(
@@ -717,12 +912,24 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * شاشة مجموعة الأذكار
+     * شاشة الأذكار
      */
     private void section(
             String title,
             DhikrData.Dhikr[] data
     ) {
+
+        if (data == null ||
+                data.length == 0) {
+
+            Toast.makeText(
+                    this,
+                    "لا توجد أذكار في هذه المجموعة",
+                    Toast.LENGTH_SHORT
+            ).show();
+
+            return;
+        }
 
         currentTitle = title;
         currentData = data;
@@ -1018,9 +1225,6 @@ public class MainActivity extends Activity {
                 }
         );
 
-        /*
-         * السحب الأفقي
-         */
         cardContainer.setOnTouchListener(
                 (v, event) -> {
 
@@ -1112,7 +1316,9 @@ public class MainActivity extends Activity {
                 }
         );
 
-        setContentView(root);
+        setContentView(
+                root
+        );
 
         showCurrentDhikr(
                 cardHolder
@@ -1429,13 +1635,6 @@ public class MainActivity extends Activity {
                 Gravity.CENTER
         );
 
-        selectedText.setPadding(
-                dp(10),
-                dp(8),
-                dp(10),
-                dp(8)
-        );
-
         root.addView(
                 selectedText
         );
@@ -1485,16 +1684,13 @@ public class MainActivity extends Activity {
                 Gravity.CENTER
         );
 
-        LinearLayout.LayoutParams countParams =
+        root.addView(
+                count,
                 new LinearLayout.LayoutParams(
                         -1,
                         0,
                         1
-                );
-
-        root.addView(
-                count,
-                countParams
+                )
         );
 
         Button add =
@@ -1624,7 +1820,9 @@ public class MainActivity extends Activity {
 
                     value[0] = 0;
 
-                    count.setText("0");
+                    count.setText(
+                            "0"
+                    );
 
                     prefs.edit()
                             .putInt(
@@ -1639,13 +1837,22 @@ public class MainActivity extends Activity {
                 v -> showHome()
         );
 
-        setContentView(root);
+        setContentView(
+                root
+        );
     }
 
     /*
-     * إعدادات التنبيهات
+     * الإعدادات
      */
     private void settings() {
+
+        ScrollView scroll =
+                new ScrollView(this);
+
+        scroll.setBackgroundColor(
+                BG
+        );
 
         LinearLayout root =
                 new LinearLayout(this);
@@ -1665,9 +1872,13 @@ public class MainActivity extends Activity {
                 BG
         );
 
+        scroll.addView(
+                root
+        );
+
         TextView title =
                 label(
-                        "⚙️  الإعدادات",
+                        "⚙️  إعدادات التذكيرات",
                         GREEN,
                         26,
                         true
@@ -1687,7 +1898,7 @@ public class MainActivity extends Activity {
 
         TextView description =
                 label(
-                        "تذكيرات أذكار الصباح والمساء",
+                        "يمكنك تشغيل أو إيقاف كل نوع وتحديد ساعة ودقيقة مستقلة له.",
                         MUTED,
                         14,
                         false
@@ -1708,25 +1919,43 @@ public class MainActivity extends Activity {
                 description
         );
 
-        /*
-         * الصباح
-         */
+        LinearLayout generalCard =
+                reminderCard(
+                        "🔔  التذكير العام",
+                        ReminderScheduler.TYPE_GENERAL
+                );
+
+        root.addView(
+                generalCard
+        );
+
         LinearLayout morningCard =
                 reminderCard(
                         "🌅  أذكار الصباح",
                         ReminderScheduler.TYPE_MORNING
                 );
 
-        root.addView(
-                morningCard
+        LinearLayout.LayoutParams morningParams =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -2
+                );
+
+        morningParams.setMargins(
+                0,
+                dp(10),
+                0,
+                0
         );
 
-        /*
-         * المساء
-         */
+        root.addView(
+                morningCard,
+                morningParams
+        );
+
         LinearLayout eveningCard =
                 reminderCard(
-                        "🌆  أذكار المساء",
+                        "🌙  أذكار المساء",
                         ReminderScheduler.TYPE_EVENING
                 );
 
@@ -1748,9 +1977,49 @@ public class MainActivity extends Activity {
                 eveningParams
         );
 
+        TextView locationTitle =
+                label(
+                        "📍 الموقع ومواقيت الصلاة",
+                        CYAN,
+                        18,
+                        true
+                );
+
+        locationTitle.setGravity(
+                Gravity.CENTER
+        );
+
+        locationTitle.setPadding(
+                0,
+                dp(18),
+                0,
+                dp(8)
+        );
+
+        root.addView(
+                locationTitle
+        );
+
+        Button locationButton =
+                createActionButton(
+                        "📍 تحديث الموقع"
+                );
+
+        root.addView(
+                locationButton,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(54)
+                )
+        );
+
+        locationButton.setOnClickListener(
+                v -> requestLocationPermissionIfNeeded()
+        );
+
         TextView info =
                 label(
-                        "ملاحظة: قد يؤخر Android التنبيه قليلًا لتوفير البطارية.",
+                        "مواقيت الصلاة تُحسب محليًا من إحداثيات الهاتف دون API خارجي. طريقة الحساب: زاوية الفجر 18° والعشاء 17°.",
                         MUTED,
                         11,
                         false
@@ -1762,7 +2031,7 @@ public class MainActivity extends Activity {
 
         info.setPadding(
                 dp(8),
-                dp(15),
+                dp(12),
                 dp(8),
                 dp(10)
         );
@@ -1788,43 +2057,71 @@ public class MainActivity extends Activity {
                 v -> showHome()
         );
 
-        setContentView(root);
+        setContentView(
+                scroll
+        );
     }
 
     /*
-     * بطاقة إعداد تنبيه
+     * بطاقة إعداد التذكير
      */
     private LinearLayout reminderCard(
             String title,
             String type
     ) {
 
+        boolean general =
+                ReminderScheduler.TYPE_GENERAL.equals(
+                        type
+                );
+
         boolean morning =
                 ReminderScheduler.TYPE_MORNING.equals(
                         type
                 );
 
+        String enabledKey;
+        String hourKey;
+        String minuteKey;
+        int defaultHour;
+
+        if (general) {
+
+            enabledKey = GENERAL_ENABLED;
+            hourKey = GENERAL_HOUR;
+            minuteKey = GENERAL_MINUTE;
+            defaultHour = 12;
+
+        } else if (morning) {
+
+            enabledKey = MORNING_ENABLED;
+            hourKey = MORNING_HOUR;
+            minuteKey = MORNING_MINUTE;
+            defaultHour = 6;
+
+        } else {
+
+            enabledKey = EVENING_ENABLED;
+            hourKey = EVENING_HOUR;
+            minuteKey = EVENING_MINUTE;
+            defaultHour = 17;
+        }
+
         boolean enabled =
                 prefs.getBoolean(
-                        morning
-                                ? MORNING_ENABLED
-                                : EVENING_ENABLED,
+                        enabledKey,
                         true
                 );
 
         int hour =
                 prefs.getInt(
-                        morning
-                                ? MORNING_HOUR
-                                : EVENING_HOUR,
-                        morning ? 6 : 17
+                        hourKey,
+                        defaultHour
                 );
 
         int minute =
                 prefs.getInt(
-                        morning
-                                ? MORNING_MINUTE
-                                : EVENING_MINUTE,
+                        minuteKey,
                         0
                 );
 
@@ -1891,7 +2188,7 @@ public class MainActivity extends Activity {
         TextView state =
                 label(
                         enabled
-                                ? "🟢 مفعّل"
+                                ? "🟢 مفعّل يوميًا"
                                 : "⚪ متوقف",
                         enabled
                                 ? GREEN
@@ -1984,9 +2281,7 @@ public class MainActivity extends Activity {
 
                     boolean current =
                             prefs.getBoolean(
-                                    morning
-                                            ? MORNING_ENABLED
-                                            : EVENING_ENABLED,
+                                    enabledKey,
                                     true
                             );
 
@@ -1995,9 +2290,7 @@ public class MainActivity extends Activity {
 
                     prefs.edit()
                             .putBoolean(
-                                    morning
-                                            ? MORNING_ENABLED
-                                            : EVENING_ENABLED,
+                                    enabledKey,
                                     newValue
                             )
                             .apply();
@@ -2008,26 +2301,31 @@ public class MainActivity extends Activity {
                                 this,
                                 type,
                                 prefs.getInt(
-                                        morning
-                                                ? MORNING_HOUR
-                                                : EVENING_HOUR,
-                                        morning ? 6 : 17
+                                        hourKey,
+                                        defaultHour
                                 ),
                                 prefs.getInt(
-                                        morning
-                                                ? MORNING_MINUTE
-                                                : EVENING_MINUTE,
+                                        minuteKey,
                                         0
                                 )
                         );
 
                     } else {
 
-                        if (morning) {
+                        if (general) {
+
+                            ReminderScheduler.cancelGeneral(
+                                    this
+                            );
+
+                        } else if (morning) {
+
                             ReminderScheduler.cancelMorning(
                                     this
                             );
+
                         } else {
+
                             ReminderScheduler.cancelEvening(
                                     this
                             );
@@ -2048,30 +2346,62 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * تغيير وقت التنبيه
+     * تغيير وقت التذكير
      */
     private void chooseReminderTime(
             String type
     ) {
+
+        boolean general =
+                ReminderScheduler.TYPE_GENERAL.equals(
+                        type
+                );
 
         boolean morning =
                 ReminderScheduler.TYPE_MORNING.equals(
                         type
                 );
 
+        String hourKey;
+        String minuteKey;
+        String enabledKey;
+        int defaultHour;
+        String title;
+
+        if (general) {
+
+            hourKey = GENERAL_HOUR;
+            minuteKey = GENERAL_MINUTE;
+            enabledKey = GENERAL_ENABLED;
+            defaultHour = 12;
+            title = "وقت التذكير العام";
+
+        } else if (morning) {
+
+            hourKey = MORNING_HOUR;
+            minuteKey = MORNING_MINUTE;
+            enabledKey = MORNING_ENABLED;
+            defaultHour = 6;
+            title = "وقت أذكار الصباح";
+
+        } else {
+
+            hourKey = EVENING_HOUR;
+            minuteKey = EVENING_MINUTE;
+            enabledKey = EVENING_ENABLED;
+            defaultHour = 17;
+            title = "وقت أذكار المساء";
+        }
+
         int hour =
                 prefs.getInt(
-                        morning
-                                ? MORNING_HOUR
-                                : EVENING_HOUR,
-                        morning ? 6 : 17
+                        hourKey,
+                        defaultHour
                 );
 
         int minute =
                 prefs.getInt(
-                        morning
-                                ? MORNING_MINUTE
-                                : EVENING_MINUTE,
+                        minuteKey,
                         0
                 );
 
@@ -2092,11 +2422,11 @@ public class MainActivity extends Activity {
 
         new AlertDialog.Builder(this)
                 .setTitle(
-                        morning
-                                ? "وقت أذكار الصباح"
-                                : "وقت أذكار المساء"
+                        title
                 )
-                .setView(picker)
+                .setView(
+                        picker
+                )
                 .setPositiveButton(
                         "حفظ",
                         (dialog, which) -> {
@@ -2107,41 +2437,20 @@ public class MainActivity extends Activity {
                             int selectedMinute =
                                     picker.getMinute();
 
-                            SharedPreferences.Editor editor =
-                                    prefs.edit();
-
-                            if (morning) {
-
-                                editor.putInt(
-                                        MORNING_HOUR,
-                                        selectedHour
-                                );
-
-                                editor.putInt(
-                                        MORNING_MINUTE,
-                                        selectedMinute
-                                );
-
-                            } else {
-
-                                editor.putInt(
-                                        EVENING_HOUR,
-                                        selectedHour
-                                );
-
-                                editor.putInt(
-                                        EVENING_MINUTE,
-                                        selectedMinute
-                                );
-                            }
-
-                            editor.apply();
+                            prefs.edit()
+                                    .putInt(
+                                            hourKey,
+                                            selectedHour
+                                    )
+                                    .putInt(
+                                            minuteKey,
+                                            selectedMinute
+                                    )
+                                    .apply();
 
                             boolean enabled =
                                     prefs.getBoolean(
-                                            morning
-                                                    ? MORNING_ENABLED
-                                                    : EVENING_ENABLED,
+                                            enabledKey,
                                             true
                                     );
 
@@ -2159,7 +2468,7 @@ public class MainActivity extends Activity {
 
                             Toast.makeText(
                                     this,
-                                    "تم حفظ وقت التذكير",
+                                    "تم حفظ وقت التذكير اليومي",
                                     Toast.LENGTH_SHORT
                             ).show();
                         }
@@ -2172,12 +2481,54 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * مواعيد الصلاة
-     *
-     * الواجهة الأولية فقط.
-     * سيتم ربطها بحساب الموقع ومواقيت الصلاة في المرحلة التالية.
+     * مواقيت الصلاة
      */
     private void prayerTimes() {
+
+        double latitude =
+                prefs.getFloat(
+                        LATITUDE,
+                        Float.NaN
+                );
+
+        double longitude =
+                prefs.getFloat(
+                        LONGITUDE,
+                        Float.NaN
+                );
+
+        if (Double.isNaN(latitude) ||
+                Double.isNaN(longitude)) {
+
+            requestLocationPermissionIfNeeded();
+
+            new AlertDialog.Builder(this)
+                    .setTitle(
+                            "📍 الموقع مطلوب"
+                    )
+                    .setMessage(
+                            "يحتاج التطبيق إلى موقع الهاتف لحساب مواقيت الصلاة محليًا. يمكنك السماح بالموقع ثم إعادة فتح هذه الصفحة."
+                    )
+                    .setPositiveButton(
+                            "السماح بالموقع",
+                            (dialog, which) ->
+                                    requestLocationPermissionIfNeeded()
+                    )
+                    .setNegativeButton(
+                            "إلغاء",
+                            null
+                    )
+                    .show();
+
+            return;
+        }
+
+        PrayerTimes times =
+                calculatePrayerTimes(
+                        latitude,
+                        longitude,
+                        Calendar.getInstance()
+                );
 
         LinearLayout root =
                 new LinearLayout(this);
@@ -2191,10 +2542,10 @@ public class MainActivity extends Activity {
         );
 
         root.setPadding(
-                dp(20),
-                dp(20),
-                dp(20),
-                dp(20)
+                dp(18),
+                dp(14),
+                dp(18),
+                dp(18)
         );
 
         root.setBackgroundColor(
@@ -2203,7 +2554,7 @@ public class MainActivity extends Activity {
 
         TextView title =
                 label(
-                        "🕌  مواعيد الصلاة",
+                        "🕌  مواقيت الصلاة",
                         GREEN,
                         27,
                         true
@@ -2217,41 +2568,72 @@ public class MainActivity extends Activity {
                 title,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(70)
+                        dp(65)
                 )
         );
 
-        TextView message =
+        TextView location =
                 label(
-                        "سيتم هنا عرض مواقيت الفجر والظهر والعصر والمغرب والعشاء حسب موقعك الجغرافي.",
-                        WHITE,
-                        17,
+                        String.format(
+                                Locale.US,
+                                "📍 %.5f , %.5f",
+                                latitude,
+                                longitude
+                        ),
+                        MUTED,
+                        11,
                         false
                 );
 
-        message.setGravity(
+        location.setGravity(
                 Gravity.CENTER
         );
 
-        message.setLineSpacing(
-                dp(5),
-                1.15f
+        root.addView(
+                location
         );
 
-        root.addView(
-                message,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        0,
-                        1
-                )
+        addPrayerRow(
+                root,
+                "🌅 الفجر",
+                times.fajr
+        );
+
+        addPrayerRow(
+                root,
+                "☀️ الشروق",
+                times.sunrise
+        );
+
+        addPrayerRow(
+                root,
+                "☀️ الظهر",
+                times.dhuhr
+        );
+
+        addPrayerRow(
+                root,
+                "🌤️ العصر",
+                times.asr
+        );
+
+        addPrayerRow(
+                root,
+                "🌇 المغرب",
+                times.maghrib
+        );
+
+        addPrayerRow(
+                root,
+                "🌙 العشاء",
+                times.isha
         );
 
         TextView method =
                 label(
-                        "حساب المواقيت محليًا دون API مدفوع.",
+                        "حساب محلي • الفجر 18° • العشاء 17° • العصر بمعيار الظل 1",
                         MUTED,
-                        13,
+                        11,
                         false
                 );
 
@@ -2259,8 +2641,43 @@ public class MainActivity extends Activity {
                 Gravity.CENTER
         );
 
+        method.setPadding(
+                0,
+                dp(12),
+                0,
+                dp(8)
+        );
+
         root.addView(
                 method
+        );
+
+        Button refresh =
+                createActionButton(
+                        "📍 تحديث الموقع"
+                );
+
+        root.addView(
+                refresh,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(52)
+                )
+        );
+
+        refresh.setOnClickListener(
+                v -> {
+
+                    requestLocationPermissionIfNeeded();
+
+                    loadLastKnownLocation();
+
+                    Toast.makeText(
+                            this,
+                            "تم تحديث الموقع إن كان متاحًا",
+                            Toast.LENGTH_SHORT
+                    ).show();
+                }
         );
 
         Button back =
@@ -2271,12 +2688,12 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams backParams =
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(56)
+                        dp(54)
                 );
 
         backParams.setMargins(
                 0,
-                dp(18),
+                dp(10),
                 0,
                 0
         );
@@ -2290,7 +2707,554 @@ public class MainActivity extends Activity {
                 v -> showHome()
         );
 
-        setContentView(root);
+        setContentView(
+                root
+        );
+    }
+
+    /*
+     * صف مواقيت الصلاة
+     */
+    private void addPrayerRow(
+            LinearLayout root,
+            String name,
+            String time
+    ) {
+
+        LinearLayout row =
+                new LinearLayout(this);
+
+        row.setGravity(
+                Gravity.CENTER_VERTICAL
+        );
+
+        row.setPadding(
+                dp(14),
+                dp(4),
+                dp(14),
+                dp(4)
+        );
+
+        row.setBackgroundResource(
+                R.drawable.card_bg
+        );
+
+        TextView nameText =
+                label(
+                        name,
+                        WHITE,
+                        17,
+                        true
+                );
+
+        nameText.setGravity(
+                Gravity.CENTER
+        );
+
+        row.addView(
+                nameText,
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(52),
+                        1
+                )
+        );
+
+        TextView timeText =
+                label(
+                        time,
+                        CYAN,
+                        19,
+                        true
+                );
+
+        timeText.setGravity(
+                Gravity.CENTER
+        );
+
+        row.addView(
+                timeText,
+                new LinearLayout.LayoutParams(
+                        dp(110),
+                        dp(52)
+                )
+        );
+
+        LinearLayout.LayoutParams rowParams =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(60)
+                );
+
+        rowParams.setMargins(
+                0,
+                dp(4),
+                0,
+                dp(4)
+        );
+
+        root.addView(
+                row,
+                rowParams
+        );
+    }
+
+    /*
+     * قراءة آخر موقع معروف
+     */
+    private void loadLastKnownLocation() {
+
+        if (Build.VERSION.SDK_INT >= 23) {
+
+            boolean fine =
+                    checkSelfPermission(
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED;
+
+            boolean coarse =
+                    checkSelfPermission(
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED;
+
+            if (!fine && !coarse) {
+                return;
+            }
+        }
+
+        LocationManager manager =
+                (LocationManager)
+                        getSystemService(
+                                LOCATION_SERVICE
+                        );
+
+        if (manager == null) {
+            return;
+        }
+
+        Location best =
+                null;
+
+        try {
+
+            Location gps =
+                    manager.getLastKnownLocation(
+                            LocationManager.GPS_PROVIDER
+                    );
+
+            Location network =
+                    manager.getLastKnownLocation(
+                            LocationManager.NETWORK_PROVIDER
+                    );
+
+            best =
+                    chooseBetterLocation(
+                            gps,
+                            network
+                    );
+
+        } catch (SecurityException ignored) {
+        }
+
+        if (best != null) {
+
+            saveLocation(
+                    best.getLatitude(),
+                    best.getLongitude()
+            );
+        }
+    }
+
+    private Location chooseBetterLocation(
+            Location a,
+            Location b
+    ) {
+
+        if (a == null) {
+            return b;
+        }
+
+        if (b == null) {
+            return a;
+        }
+
+        if (a.getTime() >= b.getTime()) {
+            return a;
+        }
+
+        return b;
+    }
+
+    private void saveLocation(
+            double latitude,
+            double longitude
+    ) {
+
+        prefs.edit()
+                .putFloat(
+                        LATITUDE,
+                        (float) latitude
+                )
+                .putFloat(
+                        LONGITUDE,
+                        (float) longitude
+                )
+                .apply();
+    }
+
+    /*
+     * حساب مواقيت الصلاة محليًا
+     */
+    private PrayerTimes calculatePrayerTimes(
+            double latitude,
+            double longitude,
+            Calendar date
+    ) {
+
+        int dayOfYear =
+                date.get(
+                        Calendar.DAY_OF_YEAR
+                );
+
+        double gamma =
+                2.0 * Math.PI / 365.0 *
+                        (dayOfYear - 1);
+
+        double equationOfTime =
+                229.18 *
+                        (
+                                0.000075
+                                        +
+                                0.001868 *
+                                        Math.cos(gamma)
+                                        -
+                                0.032077 *
+                                        Math.sin(gamma)
+                                        -
+                                0.014615 *
+                                        Math.cos(2 * gamma)
+                                        -
+                                0.040849 *
+                                        Math.sin(2 * gamma)
+                        );
+
+        double declination =
+                0.006918
+                        -
+                0.399912 *
+                        Math.cos(gamma)
+                        +
+                0.070257 *
+                        Math.sin(gamma)
+                        -
+                0.006758 *
+                        Math.cos(2 * gamma)
+                        +
+                0.000907 *
+                        Math.sin(2 * gamma)
+                        -
+                0.002697 *
+                        Math.cos(3 * gamma)
+                        +
+                0.00148 *
+                        Math.sin(3 * gamma);
+
+        double timezone =
+                TimeZoneHolder.offsetHours();
+
+        double solarNoon =
+                720.0
+                        -
+                4.0 * longitude
+                        -
+                equationOfTime
+                        +
+                60.0 * timezone;
+
+        double sunrise =
+                solarTime(
+                        solarNoon,
+                        latitude,
+                        declination,
+                        -0.833
+                );
+
+        double sunset =
+                solarTime(
+                        solarNoon,
+                        latitude,
+                        declination,
+                        -0.833
+                );
+
+        double sunriseOffset =
+                hourAngle(
+                        latitude,
+                        declination,
+                        -0.833
+                );
+
+        double sunsetTime =
+                solarNoon +
+                        4.0 * sunsetOffset;
+
+        double sunriseTime =
+                solarNoon -
+                        4.0 * sunriseOffset;
+
+        double fajrAngle =
+                hourAngle(
+                        latitude,
+                        declination,
+                        -18.0
+                );
+
+        double fajrTime =
+                solarNoon -
+                        4.0 * fajrAngle;
+
+        double ishaAngle =
+                hourAngle(
+                        latitude,
+                        declination,
+                        -17.0
+                );
+
+        double ishaTime =
+                solarNoon +
+                        4.0 * ishaAngle;
+
+        double asrTime =
+                calculateAsr(
+                        solarNoon,
+                        latitude,
+                        declination,
+                        1
+                );
+
+        PrayerTimes result =
+                new PrayerTimes();
+
+        result.fajr =
+                formatPrayerTime(
+                        fajrTime
+                );
+
+        result.sunrise =
+                formatPrayerTime(
+                        sunriseTime
+                );
+
+        result.dhuhr =
+                formatPrayerTime(
+                        solarNoon
+                );
+
+        result.asr =
+                formatPrayerTime(
+                        asrTime
+                );
+
+        result.maghrib =
+                formatPrayerTime(
+                        sunsetTime
+                );
+
+        result.isha =
+                formatPrayerTime(
+                        ishaTime
+                );
+
+        return result;
+    }
+
+    /*
+     * وقت الشمس لزاوية معينة
+     */
+    private double solarTime(
+            double solarNoon,
+            double latitude,
+            double declination,
+            double angle
+    ) {
+
+        double h =
+                hourAngle(
+                        latitude,
+                        declination,
+                        angle
+                );
+
+        return solarNoon + 4.0 * h;
+    }
+
+    /*
+     * زاوية الساعة
+     */
+    private double hourAngle(
+            double latitude,
+            double declination,
+            double solarAltitude
+    ) {
+
+        double latRad =
+                Math.toRadians(
+                        latitude
+                );
+
+        double altitudeRad =
+                Math.toRadians(
+                        solarAltitude
+                );
+
+        double cosH =
+                (
+                        Math.sin(altitudeRad)
+                                -
+                        Math.sin(latRad)
+                                *
+                        Math.sin(declination)
+                )
+                        /
+                        (
+                                Math.cos(latRad)
+                                        *
+                                Math.cos(declination)
+                        );
+
+        if (cosH > 1.0) {
+            return 180.0;
+        }
+
+        if (cosH < -1.0) {
+            return 0.0;
+        }
+
+        return Math.toDegrees(
+                Math.acos(cosH)
+        );
+    }
+
+    /*
+     * حساب العصر
+     * shadowFactor = 1
+     */
+    private double calculateAsr(
+            double solarNoon,
+            double latitude,
+            double declination,
+            int shadowFactor
+    ) {
+
+        double latRad =
+                Math.toRadians(
+                        latitude
+                );
+
+        double altitude =
+                -Math.toDegrees(
+                        Math.atan(
+                                1.0 /
+                                        (
+                                                shadowFactor
+                                                        +
+                                                Math.tan(
+                                                        Math.abs(
+                                                                latRad
+                                                        )
+                                                )
+                        )
+                );
+
+        double h =
+                hourAngle(
+                        latitude,
+                        declination,
+                        altitude
+                );
+
+        return solarNoon +
+                4.0 * h;
+    }
+
+    /*
+     * تحويل الدقائق إلى وقت
+     */
+    private String formatPrayerTime(
+            double minutes
+    ) {
+
+        while (minutes < 0) {
+            minutes += 1440;
+        }
+
+        while (minutes >= 1440) {
+            minutes -= 1440;
+        }
+
+        int hour =
+                (int) (minutes / 60);
+
+        int minute =
+                (int) Math.round(
+                        minutes % 60
+                );
+
+        if (minute >= 60) {
+
+            minute = 0;
+            hour++;
+        }
+
+        hour %= 24;
+
+        return formatTime(
+                hour,
+                minute
+        );
+    }
+
+    /*
+     * معلومات مواقيت الصلاة
+     */
+    private static class PrayerTimes {
+
+        String fajr;
+        String sunrise;
+        String dhuhr;
+        String asr;
+        String maghrib;
+        String isha;
+    }
+
+    /*
+     * المنطقة الزمنية المحلية
+     */
+    private static class TimeZoneHolder {
+
+        static double offsetHours() {
+
+            return TimeZoneOffset.get();
+        }
+    }
+
+    private static class TimeZoneOffset {
+
+        static double get() {
+
+            java.util.TimeZone zone =
+                    java.util.TimeZone.getDefault();
+
+            long now =
+                    System.currentTimeMillis();
+
+            int offset =
+                    zone.getOffset(
+                            now
+                    );
+
+            return offset /
+                    3600000.0;
+        }
     }
 
     /*
@@ -2353,7 +3317,7 @@ public class MainActivity extends Activity {
 
         TextView version =
                 label(
-                        "الإصدار 2.0.0",
+                        "الإصدار 2.1.0",
                         CYAN,
                         14,
                         false
@@ -2452,12 +3416,11 @@ public class MainActivity extends Activity {
                 v -> showHome()
         );
 
-        setContentView(root);
+        setContentView(
+                root
+        );
     }
 
-    /*
-     * زر أندرويد للرجوع
-     */
     @Override
     public void onBackPressed() {
 
@@ -2559,7 +3522,7 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * تنسيق تقدم التكرار
+     * تقدم التكرار
      */
     private String progress(
             int current,
@@ -2616,7 +3579,7 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * إنشاء TextView موحد
+     * TextView موحد
      */
     private TextView label(
             String text,
@@ -2659,7 +3622,7 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * تحويل dp إلى px
+     * dp إلى px
      */
     private int dp(
             int value
