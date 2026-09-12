@@ -1,6 +1,7 @@
 package com.saleh.wadhkur;
 
 import android.Manifest;
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -72,15 +73,36 @@ public class ReminderReceiver extends BroadcastReceiver {
                     );
 
         } else {
+
             return;
         }
 
         /*
-         * إذا أوقف المستخدم هذا النوع
-         * فلا نرسل الإشعار ولا نعيد جدولتَه.
+         * إذا أوقف المستخدم التنبيه
+         * لا نعيد جدولتَه.
          */
         if (!enabled) {
             return;
+        }
+
+        /*
+         * نعيد جدولة التنبيه أولًا.
+         *
+         * هذا مهم جدًا:
+         * حتى إذا كانت صلاحية الإشعارات مرفوضة،
+         * يبقى التنبيه اليومي مجدولًا لليوم التالي.
+         */
+        if (ReminderScheduler.TYPE_MORNING.equals(type)) {
+
+            ReminderScheduler.scheduleMorning(
+                    context
+            );
+
+        } else {
+
+            ReminderScheduler.scheduleEvening(
+                    context
+            );
         }
 
         /*
@@ -161,7 +183,8 @@ public class ReminderReceiver extends BroadcastReceiver {
 
         openIntent.setFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK
-                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        |
+                Intent.FLAG_ACTIVITY_CLEAR_TOP
         );
 
         PendingIntent openPendingIntent =
@@ -170,7 +193,8 @@ public class ReminderReceiver extends BroadcastReceiver {
                         notificationId,
                         openIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT
-                                | PendingIntent.FLAG_IMMUTABLE
+                                |
+                        PendingIntent.FLAG_IMMUTABLE
                 );
 
         NotificationManager manager =
@@ -237,24 +261,6 @@ public class ReminderReceiver extends BroadcastReceiver {
                 notificationId,
                 builder.build()
         );
-
-        /*
-         * إعادة جدولة نفس التنبيه لليوم التالي.
-         */
-        if (
-                ReminderScheduler.TYPE_MORNING.equals(type)
-        ) {
-
-            ReminderScheduler.scheduleMorning(
-                    context
-            );
-
-        } else {
-
-            ReminderScheduler.scheduleEvening(
-                    context
-            );
-        }
     }
 
     private void createChannel(
