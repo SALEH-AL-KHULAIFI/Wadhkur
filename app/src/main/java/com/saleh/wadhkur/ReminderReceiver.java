@@ -8,6 +8,7 @@ import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 
@@ -20,6 +21,9 @@ public class ReminderReceiver extends BroadcastReceiver {
 
     private static final String CHANNEL_ID =
             "wadhkur_daily_reminders";
+
+    private static final int GENERAL_NOTIFICATION_ID =
+            8800;
 
     private static final int MORNING_NOTIFICATION_ID =
             8801;
@@ -38,15 +42,13 @@ public class ReminderReceiver extends BroadcastReceiver {
         }
 
         String type =
-                intent.getStringExtra(
-                        EXTRA_TYPE
-                );
+                intent.getStringExtra(EXTRA_TYPE);
 
         if (type == null) {
             return;
         }
 
-        android.content.SharedPreferences prefs =
+        SharedPreferences prefs =
                 context.getSharedPreferences(
                         "settings",
                         Context.MODE_PRIVATE
@@ -54,7 +56,17 @@ public class ReminderReceiver extends BroadcastReceiver {
 
         boolean enabled;
 
-        if (ReminderScheduler.TYPE_MORNING.equals(type)) {
+        if (ReminderScheduler.TYPE_GENERAL.equals(type)) {
+
+            enabled =
+                    prefs.getBoolean(
+                            "general_enabled",
+                            true
+                    );
+
+        } else if (
+                ReminderScheduler.TYPE_MORNING.equals(type)
+        ) {
 
             enabled =
                     prefs.getBoolean(
@@ -78,21 +90,28 @@ public class ReminderReceiver extends BroadcastReceiver {
         }
 
         /*
-         * إذا أوقف المستخدم التنبيه
-         * لا نعيد جدولتَه.
+         * إذا كان التنبيه معطلاً،
+         * لا نعرض إشعارًا ولا نعيد جدولتَه.
          */
         if (!enabled) {
             return;
         }
 
         /*
-         * نعيد جدولة التنبيه أولًا.
+         * إعادة جدولة التنبيه لليوم التالي.
          *
-         * هذا مهم جدًا:
-         * حتى إذا كانت صلاحية الإشعارات مرفوضة،
-         * يبقى التنبيه اليومي مجدولًا لليوم التالي.
+         * هذا يجعل التنبيه مستمرًا حتى بعد تشغيل
+         * الإشعار الحالي.
          */
-        if (ReminderScheduler.TYPE_MORNING.equals(type)) {
+        if (ReminderScheduler.TYPE_GENERAL.equals(type)) {
+
+            ReminderScheduler.scheduleGeneral(
+                    context
+            );
+
+        } else if (
+                ReminderScheduler.TYPE_MORNING.equals(type)
+        ) {
 
             ReminderScheduler.scheduleMorning(
                     context
@@ -107,7 +126,7 @@ public class ReminderReceiver extends BroadcastReceiver {
 
         /*
          * Android 13+
-         * يحتاج POST_NOTIFICATIONS.
+         * يحتاج صلاحية POST_NOTIFICATIONS.
          */
         if (Build.VERSION.SDK_INT >= 33) {
 
@@ -129,11 +148,28 @@ public class ReminderReceiver extends BroadcastReceiver {
 
         int notificationId;
 
+        /*
+         * التنبيه العام:
+         * يختار ذكرًا كاملًا عشوائيًا.
+         */
         if (
+                ReminderScheduler.TYPE_GENERAL.equals(type)
+        ) {
+
+            data = getGeneralDhikr();
+
+            title =
+                    "🔔 وذكر";
+
+            notificationId =
+                    GENERAL_NOTIFICATION_ID;
+
+        } else if (
                 ReminderScheduler.TYPE_MORNING.equals(type)
         ) {
 
-            data = DhikrData.MORNING;
+            data =
+                    DhikrData.MORNING;
 
             title =
                     "🌅 أذكار الصباح";
@@ -143,10 +179,11 @@ public class ReminderReceiver extends BroadcastReceiver {
 
         } else {
 
-            data = DhikrData.EVENING;
+            data =
+                    DhikrData.EVENING;
 
             title =
-                    "🌆 أذكار المساء";
+                    "🌙 أذكار المساء";
 
             notificationId =
                     EVENING_NOTIFICATION_ID;
@@ -160,15 +197,29 @@ public class ReminderReceiver extends BroadcastReceiver {
         }
 
         /*
-         * اختيار ذكر كامل من القائمة.
+         * اختيار ذكر كامل عشوائيًا.
          */
         int index =
                 new Random().nextInt(
                         data.length
                 );
 
+        DhikrData.Dhikr selected =
+                data[index];
+
+        if (selected == null) {
+            return;
+        }
+
         String text =
-                data[index].text;
+                selected.text;
+
+        if (
+                text == null ||
+                text.trim().isEmpty()
+        ) {
+            return;
+        }
 
         Intent openIntent =
                 new Intent(
@@ -263,6 +314,65 @@ public class ReminderReceiver extends BroadcastReceiver {
         );
     }
 
+    /**
+     * إنشاء مجموعة الأذكار الخاصة بالتنبيه العام.
+     *
+     * نجمع أذكار الصباح والمساء في قائمة واحدة،
+     * وبالتالي يستطيع التنبيه العام اختيار ذكر
+     * كامل وعشوائي من المجموعتين.
+     */
+    private DhikrData.Dhikr[] getGeneralDhikr() {
+
+        int morningLength =
+                DhikrData.MORNING == null
+                        ? 0
+                        : DhikrData.MORNING.length;
+
+        int eveningLength =
+                DhikrData.EVENING == null
+                        ? 0
+                        : DhikrData.EVENING.length;
+
+        int total =
+                morningLength +
+                eveningLength;
+
+        if (total == 0) {
+            return new DhikrData.Dhikr[0];
+        }
+
+        DhikrData.Dhikr[] result =
+                new DhikrData.Dhikr[total];
+
+        int position = 0;
+
+        if (DhikrData.MORNING != null) {
+
+            for (
+                    DhikrData.Dhikr dhikr
+                    : DhikrData.MORNING
+            ) {
+
+                result[position++] =
+                        dhikr;
+            }
+        }
+
+        if (DhikrData.EVENING != null) {
+
+            for (
+                    DhikrData.Dhikr dhikr
+                    : DhikrData.EVENING
+            ) {
+
+                result[position++] =
+                        dhikr;
+            }
+        }
+
+        return result;
+    }
+
     private void createChannel(
             Context context
     ) {
@@ -289,7 +399,7 @@ public class ReminderReceiver extends BroadcastReceiver {
                 );
 
         channel.setDescription(
-                "تنبيهات أذكار الصباح والمساء"
+                "تنبيهات الأذكار العامة وأذكار الصباح والمساء"
         );
 
         channel.enableVibration(
