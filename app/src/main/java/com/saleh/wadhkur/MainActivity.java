@@ -1,19 +1,37 @@
 package com.saleh.wadhkur;
 
 import android.Manifest;
-import android.app.*;
-import android.content.*;
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
-import android.os.*;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
-import android.view.*;
-import android.widget.*;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.TimePicker;
+import android.widget.Toast;
 
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
 
 public class MainActivity extends Activity {
 
@@ -25,6 +43,17 @@ public class MainActivity extends Activity {
     private static final int WHITE = Color.rgb(239, 250, 245);
     private static final int MUTED = Color.rgb(150, 170, 182);
     private static final int RED = Color.rgb(255, 85, 105);
+
+    private static final String PREFS = "settings";
+
+    private static final String MORNING_ENABLED = "morning_enabled";
+    private static final String EVENING_ENABLED = "evening_enabled";
+
+    private static final String MORNING_HOUR = "morning_hour";
+    private static final String MORNING_MINUTE = "morning_minute";
+
+    private static final String EVENING_HOUR = "evening_hour";
+    private static final String EVENING_MINUTE = "evening_minute";
 
     private SharedPreferences prefs;
 
@@ -47,7 +76,7 @@ public class MainActivity extends Activity {
     private float downX;
     private float downY;
 
-    private Handler countdownHandler =
+    private final Handler countdownHandler =
             new Handler(Looper.getMainLooper());
 
     private TextView ramadanCountdownText;
@@ -70,29 +99,34 @@ public class MainActivity extends Activity {
             };
 
     @Override
-    public void onCreate(Bundle b) {
+    protected void onCreate(Bundle b) {
 
         super.onCreate(b);
 
         prefs = getSharedPreferences(
-                "settings",
+                PREFS,
                 MODE_PRIVATE
         );
 
+        initializeReminderDefaults();
+
         showHome();
 
-        if (Build.VERSION.SDK_INT >= 33 &&
-                checkSelfPermission(
-                        Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED) {
+        handleNotificationIntent(getIntent());
 
-            requestPermissions(
-                    new String[]{
-                            Manifest.permission.POST_NOTIFICATIONS
-                    },
-                    44
-            );
-        }
+        requestNotificationPermissionIfNeeded();
+
+        scheduleEnabledReminders();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+
+        super.onNewIntent(intent);
+
+        setIntent(intent);
+
+        handleNotificationIntent(intent);
     }
 
     @Override
@@ -103,6 +137,157 @@ public class MainActivity extends Activity {
         );
 
         super.onDestroy();
+    }
+
+    /*
+     * القيم الافتراضية للتنبيهات
+     */
+    private void initializeReminderDefaults() {
+
+        if (!prefs.contains(MORNING_ENABLED)) {
+            prefs.edit()
+                    .putBoolean(
+                            MORNING_ENABLED,
+                            true
+                    )
+                    .apply();
+        }
+
+        if (!prefs.contains(EVENING_ENABLED)) {
+            prefs.edit()
+                    .putBoolean(
+                            EVENING_ENABLED,
+                            true
+                    )
+                    .apply();
+        }
+
+        if (!prefs.contains(MORNING_HOUR)) {
+            prefs.edit()
+                    .putInt(
+                            MORNING_HOUR,
+                            6
+                    )
+                    .putInt(
+                            MORNING_MINUTE,
+                            0
+                    )
+                    .apply();
+        }
+
+        if (!prefs.contains(EVENING_HOUR)) {
+            prefs.edit()
+                    .putInt(
+                            EVENING_HOUR,
+                            17
+                    )
+                    .putInt(
+                            EVENING_MINUTE,
+                            0
+                    )
+                    .apply();
+        }
+    }
+
+    /*
+     * طلب إذن الإشعارات
+     */
+    private void requestNotificationPermissionIfNeeded() {
+
+        if (Build.VERSION.SDK_INT >= 33) {
+
+            if (checkSelfPermission(
+                    Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED) {
+
+                requestPermissions(
+                        new String[]{
+                                Manifest.permission.POST_NOTIFICATIONS
+                        },
+                        44
+                );
+            }
+        }
+    }
+
+    /*
+     * تشغيل التنبيهات المفعلة
+     */
+    private void scheduleEnabledReminders() {
+
+        if (prefs.getBoolean(
+                MORNING_ENABLED,
+                true
+        )) {
+
+            ReminderScheduler.schedule(
+                    this,
+                    ReminderScheduler.TYPE_MORNING,
+                    prefs.getInt(
+                            MORNING_HOUR,
+                            6
+                    ),
+                    prefs.getInt(
+                            MORNING_MINUTE,
+                            0
+                    )
+            );
+        }
+
+        if (prefs.getBoolean(
+                EVENING_ENABLED,
+                true
+        )) {
+
+            ReminderScheduler.schedule(
+                    this,
+                    ReminderScheduler.TYPE_EVENING,
+                    prefs.getInt(
+                            EVENING_HOUR,
+                            17
+                    ),
+                    prefs.getInt(
+                            EVENING_MINUTE,
+                            0
+                    )
+            );
+        }
+    }
+
+    /*
+     * التعامل مع الضغط على إشعار
+     */
+    private void handleNotificationIntent(Intent intent) {
+
+        if (intent == null) {
+            return;
+        }
+
+        String section =
+                intent.getStringExtra(
+                        "open_section"
+                );
+
+        if (section == null) {
+            return;
+        }
+
+        if (ReminderScheduler.TYPE_MORNING.equals(section)) {
+
+            section(
+                    "🌅 أذكار الصباح",
+                    DhikrData.MORNING
+            );
+
+        } else if (
+                ReminderScheduler.TYPE_EVENING.equals(section)
+        ) {
+
+            section(
+                    "🌆 أذكار المساء",
+                    DhikrData.EVENING
+            );
+        }
     }
 
     /*
@@ -127,65 +312,102 @@ public class MainActivity extends Activity {
                 R.id.statusText
         );
 
-        findViewById(
-                R.id.morningBtn
-        ).setOnClickListener(
-                v -> section(
-                        "🌅 أذكار الصباح",
-                        DhikrData.MORNING
-                )
-        );
+        View morning =
+                findViewById(
+                        R.id.morningBtn
+                );
 
-        findViewById(
-                R.id.eveningBtn
-        ).setOnClickListener(
-                v -> section(
-                        "🌆 أذكار المساء",
-                        DhikrData.EVENING
-                )
-        );
+        if (morning != null) {
 
-        findViewById(
-                R.id.duasBtn
-        ).setOnClickListener(
-                v -> section(
-                        "🤲 الأدعية",
-                        DhikrData.DUAS
-                )
-        );
+            morning.setOnClickListener(
+                    v -> section(
+                            "🌅 أذكار الصباح",
+                            DhikrData.MORNING
+                    )
+            );
+        }
 
-        findViewById(
-                R.id.surasBtn
-        ).setOnClickListener(
-                v -> section(
-                        "📖 السور والآيات",
-                        DhikrData.SURAS
-                )
-        );
+        View evening =
+                findViewById(
+                        R.id.eveningBtn
+                );
 
-        findViewById(
-                R.id.tasbeehBtn
-        ).setOnClickListener(
-                v -> tasbeeh()
-        );
+        if (evening != null) {
 
-        findViewById(
-                R.id.settingsBtn
-        ).setOnClickListener(
-                v -> settings()
-        );
+            evening.setOnClickListener(
+                    v -> section(
+                            "🌆 أذكار المساء",
+                            DhikrData.EVENING
+                    )
+            );
+        }
 
-        findViewById(
-                R.id.aboutBtn
-        ).setOnClickListener(
-                v -> about()
-        );
+        View duas =
+                findViewById(
+                        R.id.duasBtn
+                );
+
+        if (duas != null) {
+
+            duas.setOnClickListener(
+                    v -> section(
+                            "🤲 الأدعية",
+                            DhikrData.DUAS
+                    )
+            );
+        }
+
+        View tasbeeh =
+                findViewById(
+                        R.id.tasbeehBtn
+                );
+
+        if (tasbeeh != null) {
+
+            tasbeeh.setOnClickListener(
+                    v -> tasbeeh()
+            );
+        }
+
+        View prayer =
+                findViewById(
+                        R.id.prayerBtn
+                );
+
+        if (prayer != null) {
+
+            prayer.setOnClickListener(
+                    v -> prayerTimes()
+            );
+        }
+
+        View settings =
+                findViewById(
+                        R.id.settingsBtn
+                );
+
+        if (settings != null) {
+
+            settings.setOnClickListener(
+                    v -> settings()
+            );
+        }
+
+        View about =
+                findViewById(
+                        R.id.aboutBtn
+                );
+
+        if (about != null) {
+
+            about.setOnClickListener(
+                    v -> about()
+            );
+        }
 
         refresh();
 
         addRamadanCountdown();
-
-        addExitButton();
     }
 
     /*
@@ -207,6 +429,7 @@ public class MainActivity extends Activity {
 
         if (!(scrollView.getChildAt(0)
                 instanceof LinearLayout)) {
+
             return;
         }
 
@@ -225,10 +448,10 @@ public class MainActivity extends Activity {
         );
 
         ramadanCard.setPadding(
-                dp(16),
-                dp(13),
-                dp(16),
-                dp(13)
+                dp(14),
+                dp(10),
+                dp(14),
+                dp(10)
         );
 
         ramadanCard.setBackgroundResource(
@@ -236,7 +459,7 @@ public class MainActivity extends Activity {
         );
 
         ramadanCard.setElevation(
-                dp(5)
+                dp(4)
         );
 
         LinearLayout.LayoutParams cardParams =
@@ -247,7 +470,7 @@ public class MainActivity extends Activity {
 
         cardParams.setMargins(
                 0,
-                dp(12),
+                dp(8),
                 0,
                 dp(2)
         );
@@ -260,7 +483,7 @@ public class MainActivity extends Activity {
                 label(
                         "🌙  العد التنازلي لرمضان 1448",
                         GREEN,
-                        17,
+                        16,
                         true
                 );
 
@@ -268,13 +491,15 @@ public class MainActivity extends Activity {
                 Gravity.CENTER
         );
 
-        ramadanCard.addView(title);
+        ramadanCard.addView(
+                title
+        );
 
         ramadanCountdownText =
                 label(
                         "جاري الحساب...",
                         CYAN,
-                        22,
+                        21,
                         true
                 );
 
@@ -284,9 +509,9 @@ public class MainActivity extends Activity {
 
         ramadanCountdownText.setPadding(
                 0,
-                dp(6),
+                dp(5),
                 0,
-                dp(3)
+                dp(2)
         );
 
         ramadanCard.addView(
@@ -297,7 +522,7 @@ public class MainActivity extends Activity {
                 label(
                         "الموعد المتوقع: 8 فبراير 2027 • قد يختلف حسب رؤية الهلال",
                         MUTED,
-                        11,
+                        10,
                         false
                 );
 
@@ -305,7 +530,9 @@ public class MainActivity extends Activity {
                 Gravity.CENTER
         );
 
-        ramadanCard.addView(note);
+        ramadanCard.addView(
+                note
+        );
 
         root.addView(
                 ramadanCard,
@@ -394,100 +621,15 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * زر الخروج
-     */
-    private void addExitButton() {
-
-        View content =
-                ((ViewGroup) findViewById(
-                        android.R.id.content
-                )).getChildAt(0);
-
-        if (!(content instanceof ScrollView)) {
-            return;
-        }
-
-        ScrollView scrollView =
-                (ScrollView) content;
-
-        if (!(scrollView.getChildAt(0)
-                instanceof LinearLayout)) {
-            return;
-        }
-
-        LinearLayout root =
-                (LinearLayout) scrollView.getChildAt(0);
-
-        Button exit =
-                new Button(this);
-
-        exit.setText(
-                "⏻  خروج من التطبيق"
-        );
-
-        exit.setTextColor(RED);
-
-        exit.setTextSize(15);
-
-        exit.setAllCaps(false);
-
-        exit.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
-
-        exit.setBackgroundResource(
-                R.drawable.card_bg
-        );
-
-        LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(52)
-                );
-
-        params.setMargins(
-                0,
-                dp(8),
-                0,
-                dp(8)
-        );
-
-        root.addView(
-                exit,
-                params
-        );
-
-        exit.setOnClickListener(
-                v -> confirmExit()
-        );
-    }
-
-    private void confirmExit() {
-
-        new AlertDialog.Builder(this)
-                .setTitle(
-                        "الخروج من وذكر"
-                )
-                .setMessage(
-                        "هل تريد إغلاق التطبيق؟"
-                )
-                .setPositiveButton(
-                        "خروج",
-                        (dialog, which) ->
-                                finishAffinity()
-                )
-                .setNegativeButton(
-                        "إلغاء",
-                        null
-                )
-                .show();
-    }
-
-    /*
-     * تحديث الحصيلة اليومية والتذكيرات
+     * تحديث الحصيلة وحالة التنبيهات
      */
     private void refresh() {
+
+        if (countText == null ||
+                statusText == null) {
+
+            return;
+        }
 
         String d = today();
 
@@ -519,24 +661,42 @@ public class MainActivity extends Activity {
                 )
         );
 
-        boolean enabled =
+        boolean morning =
                 prefs.getBoolean(
-                        "enabled",
-                        false
+                        MORNING_ENABLED,
+                        true
                 );
 
-        long minutes =
-                prefs.getLong(
-                        "minutes",
-                        30
+        boolean evening =
+                prefs.getBoolean(
+                        EVENING_ENABLED,
+                        true
                 );
 
-        if (enabled) {
+        if (morning && evening) {
 
             statusText.setText(
-                    "🟢 نشط الآن • تذكير كل " +
-                            minutes +
-                            " دقيقة"
+                    "🟢 تذكيرات الصباح والمساء مفعلة"
+            );
+
+            statusText.setTextColor(
+                    GREEN
+            );
+
+        } else if (morning) {
+
+            statusText.setText(
+                    "🟢 تذكير أذكار الصباح مفعّل"
+            );
+
+            statusText.setTextColor(
+                    GREEN
+            );
+
+        } else if (evening) {
+
+            statusText.setText(
+                    "🟢 تذكير أذكار المساء مفعّل"
             );
 
             statusText.setTextColor(
@@ -546,7 +706,7 @@ public class MainActivity extends Activity {
         } else {
 
             statusText.setText(
-                    "⚪ التذكيرات متوقفة"
+                    "⚪ تذكيرات الأذكار متوقفة"
             );
 
             statusText.setTextColor(
@@ -557,7 +717,6 @@ public class MainActivity extends Activity {
 
     /*
      * شاشة مجموعة الأذكار
-     * بطاقة واحدة فقط في كل مرة.
      */
     private void section(
             String title,
@@ -591,9 +750,6 @@ public class MainActivity extends Activity {
                 View.LAYOUT_DIRECTION_RTL
         );
 
-        /*
-         * رأس الصفحة
-         */
         LinearLayout header =
                 new LinearLayout(this);
 
@@ -646,35 +802,10 @@ public class MainActivity extends Activity {
                 )
         );
 
-        TextView exit =
-                label(
-                        "×",
-                        RED,
-                        30,
-                        true
-                );
-
-        exit.setGravity(
-                Gravity.CENTER
+        root.addView(
+                header
         );
 
-        exit.setOnClickListener(
-                v -> confirmExit()
-        );
-
-        header.addView(
-                exit,
-                new LinearLayout.LayoutParams(
-                        dp(48),
-                        dp(58)
-                )
-        );
-
-        root.addView(header);
-
-        /*
-         * التعليمات
-         */
         TextView instruction =
                 label(
                         "اسحب يمينًا أو يسارًا للتنقل بين الأذكار",
@@ -694,11 +825,10 @@ public class MainActivity extends Activity {
                 dp(7)
         );
 
-        root.addView(instruction);
+        root.addView(
+                instruction
+        );
 
-        /*
-         * رقم البطاقة
-         */
         dhikrPositionText =
                 label(
                         "",
@@ -719,9 +849,6 @@ public class MainActivity extends Activity {
                 )
         );
 
-        /*
-         * حاوية البطاقة
-         */
         FrameLayout cardContainer =
                 new FrameLayout(this);
 
@@ -777,9 +904,6 @@ public class MainActivity extends Activity {
                 cardContainer
         );
 
-        /*
-         * أزرار التنقل
-         */
         LinearLayout navigation =
                 new LinearLayout(this);
 
@@ -795,60 +919,14 @@ public class MainActivity extends Activity {
         );
 
         Button previous =
-                new Button(this);
-
-        previous.setText(
-                "‹  السابق"
-        );
-
-        previous.setTextColor(
-                BG
-        );
-
-        previous.setTextSize(
-                15
-        );
-
-        previous.setAllCaps(
-                false
-        );
-
-        previous.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
-
-        previous.setBackgroundResource(
-                R.drawable.neon_button
-        );
+                createActionButton(
+                        "‹  السابق"
+                );
 
         Button next =
-                new Button(this);
-
-        next.setText(
-                "التالي  ›"
-        );
-
-        next.setTextColor(
-                BG
-        );
-
-        next.setTextSize(
-                15
-        );
-
-        next.setAllCaps(
-                false
-        );
-
-        next.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
-
-        next.setBackgroundResource(
-                R.drawable.neon_button
-        );
+                createActionButton(
+                        "التالي  ›"
+                );
 
         LinearLayout.LayoutParams navParams =
                 new LinearLayout.LayoutParams(
@@ -882,64 +960,62 @@ public class MainActivity extends Activity {
                 navigation
         );
 
-        /*
-         * السابق
-         */
-        previous.setOnClickListener(v -> {
+        previous.setOnClickListener(
+                v -> {
 
-            if (currentIndex > 0) {
+                    if (currentIndex > 0) {
 
-                currentIndex--;
-                currentRepeat = 0;
+                        currentIndex--;
+                        currentRepeat = 0;
 
-                showCurrentDhikr(
-                        cardHolder
-                );
+                        showCurrentDhikr(
+                                cardHolder
+                        );
 
-                cardScroll.scrollTo(
-                        0,
-                        0
-                );
+                        cardScroll.scrollTo(
+                                0,
+                                0
+                        );
 
-            } else {
+                    } else {
 
-                Toast.makeText(
-                        this,
-                        "هذا أول ذكر",
-                        Toast.LENGTH_SHORT
-                ).show();
-            }
-        });
+                        Toast.makeText(
+                                this,
+                                "هذا أول ذكر",
+                                Toast.LENGTH_SHORT
+                        ).show();
+                    }
+                }
+        );
 
-        /*
-         * التالي
-         */
-        next.setOnClickListener(v -> {
+        next.setOnClickListener(
+                v -> {
 
-            if (currentIndex <
-                    currentData.length - 1) {
+                    if (currentIndex <
+                            currentData.length - 1) {
 
-                currentIndex++;
-                currentRepeat = 0;
+                        currentIndex++;
+                        currentRepeat = 0;
 
-                showCurrentDhikr(
-                        cardHolder
-                );
+                        showCurrentDhikr(
+                                cardHolder
+                        );
 
-                cardScroll.scrollTo(
-                        0,
-                        0
-                );
+                        cardScroll.scrollTo(
+                                0,
+                                0
+                        );
 
-            } else {
+                    } else {
 
-                Toast.makeText(
-                        this,
-                        "أكملت آخر ذكر في المجموعة",
-                        Toast.LENGTH_SHORT
-                ).show();
-            }
-        });
+                        Toast.makeText(
+                                this,
+                                "أكملت آخر ذكر في المجموعة",
+                                Toast.LENGTH_SHORT
+                        ).show();
+                    }
+                }
+        );
 
         /*
          * السحب الأفقي
@@ -1060,18 +1136,12 @@ public class MainActivity extends Activity {
         DhikrData.Dhikr dhikr =
                 currentData[currentIndex];
 
-        /*
-         * تحديث المؤشر
-         */
         dhikrPositionText.setText(
                 (currentIndex + 1) +
                         " من " +
                         currentData.length
         );
 
-        /*
-         * البطاقة
-         */
         LinearLayout card =
                 new LinearLayout(this);
 
@@ -1115,9 +1185,6 @@ public class MainActivity extends Activity {
                 cardParams
         );
 
-        /*
-         * عنوان الذكر
-         */
         dhikrTitleText =
                 label(
                         "✦  " +
@@ -1136,9 +1203,6 @@ public class MainActivity extends Activity {
                 dhikrTitleText
         );
 
-        /*
-         * نص الذكر
-         */
         dhikrBodyText =
                 label(
                         dhikr.text,
@@ -1167,9 +1231,6 @@ public class MainActivity extends Activity {
                 dhikrBodyText
         );
 
-        /*
-         * المصدر
-         */
         if (dhikr.source != null &&
                 !dhikr.source.trim().isEmpty()) {
 
@@ -1197,11 +1258,6 @@ public class MainActivity extends Activity {
             );
         }
 
-        /*
-         * عداد التكرار
-         *
-         * DhikrData يستخدم count وليس repeat.
-         */
         int targetRepeat =
                 Math.max(
                         1,
@@ -1227,38 +1283,12 @@ public class MainActivity extends Activity {
                 dhikrCounterText
         );
 
-        /*
-         * زر التكرار
-         */
         dhikrActionButton =
-                new Button(this);
-
-        dhikrActionButton.setText(
-                currentRepeat >= targetRepeat
-                        ? "✓  مكتمل"
-                        : "تسبيح / تكرار"
-        );
-
-        dhikrActionButton.setTextColor(
-                BG
-        );
-
-        dhikrActionButton.setTextSize(
-                16
-        );
-
-        dhikrActionButton.setAllCaps(
-                false
-        );
-
-        dhikrActionButton.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
-
-        dhikrActionButton.setBackgroundResource(
-                R.drawable.neon_button
-        );
+                createActionButton(
+                        currentRepeat >= targetRepeat
+                                ? "✓  مكتمل"
+                                : "تسبيح / تكرار"
+                );
 
         LinearLayout.LayoutParams actionParams =
                 new LinearLayout.LayoutParams(
@@ -1314,7 +1344,9 @@ public class MainActivity extends Activity {
                 }
         );
 
-        holder.addView(card);
+        holder.addView(
+                card
+        );
     }
 
     /*
@@ -1322,12 +1354,25 @@ public class MainActivity extends Activity {
      */
     private void tasbeeh() {
 
+        final String[] names = {
+                "سبحان الله",
+                "الحمد لله",
+                "الله أكبر",
+                "سبحان الله العظيم",
+                "أستغفر الله العظيم وأتوب إليه",
+                "اللهم صل وسلم على نبينا محمد",
+                "لا إله إلا أنت سبحانك إني كنت من الظالمين",
+                "لا حول ولا قوة إلا بالله العظيم"
+        };
+
         final int[] value = {
                 prefs.getInt(
                         "tasbeeh",
                         0
                 )
         };
+
+        final int[] selected = {0};
 
         LinearLayout root =
                 new LinearLayout(this);
@@ -1341,10 +1386,10 @@ public class MainActivity extends Activity {
         );
 
         root.setPadding(
-                dp(20),
-                dp(15),
-                dp(20),
-                dp(20)
+                dp(18),
+                dp(12),
+                dp(18),
+                dp(18)
         );
 
         root.setBackgroundColor(
@@ -1355,7 +1400,7 @@ public class MainActivity extends Activity {
                 label(
                         "📿  عداد التسبيح",
                         GREEN,
-                        26,
+                        25,
                         true
                 );
 
@@ -1367,7 +1412,61 @@ public class MainActivity extends Activity {
                 title,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(65)
+                        dp(60)
+                )
+        );
+
+        TextView selectedText =
+                label(
+                        names[selected[0]],
+                        WHITE,
+                        21,
+                        true
+                );
+
+        selectedText.setGravity(
+                Gravity.CENTER
+        );
+
+        selectedText.setPadding(
+                dp(10),
+                dp(8),
+                dp(10),
+                dp(8)
+        );
+
+        root.addView(
+                selectedText
+        );
+
+        Button choose =
+                new Button(this);
+
+        choose.setText(
+                "اختيار الذكر"
+        );
+
+        choose.setTextColor(
+                CYAN
+        );
+
+        choose.setTextSize(
+                14
+        );
+
+        choose.setAllCaps(
+                false
+        );
+
+        choose.setBackgroundResource(
+                R.drawable.card_bg
+        );
+
+        root.addView(
+                choose,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(48)
                 )
         );
 
@@ -1377,7 +1476,7 @@ public class MainActivity extends Activity {
                                 value[0]
                         ),
                         CYAN,
-                        64,
+                        62,
                         true
                 );
 
@@ -1398,32 +1497,9 @@ public class MainActivity extends Activity {
         );
 
         Button add =
-                new Button(this);
-
-        add.setText(
-                "سبّح  +1"
-        );
-
-        add.setTextColor(
-                BG
-        );
-
-        add.setTextSize(
-                20
-        );
-
-        add.setAllCaps(
-                false
-        );
-
-        add.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
-
-        add.setBackgroundResource(
-                R.drawable.neon_button
-        );
+                createActionButton(
+                        "سبّح  +1"
+                );
 
         root.addView(
                 add,
@@ -1488,12 +1564,39 @@ public class MainActivity extends Activity {
 
         back.setPadding(
                 0,
-                dp(15),
+                dp(12),
                 0,
-                dp(8)
+                dp(6)
         );
 
-        root.addView(back);
+        root.addView(
+                back
+        );
+
+        choose.setOnClickListener(
+                v -> {
+
+                    new AlertDialog.Builder(this)
+                            .setTitle(
+                                    "اختر الذكر"
+                            )
+                            .setSingleChoiceItems(
+                                    names,
+                                    selected[0],
+                                    (dialog, which) -> {
+
+                                        selected[0] = which;
+
+                                        selectedText.setText(
+                                                names[which]
+                                        );
+
+                                        dialog.dismiss();
+                                    }
+                            )
+                            .show();
+                }
+        );
 
         add.setOnClickListener(
                 v -> {
@@ -1539,123 +1642,654 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * الإعدادات
+     * إعدادات التنبيهات
      */
     private void settings() {
 
-        final EditText input =
-                new EditText(this);
+        LinearLayout root =
+                new LinearLayout(this);
 
-        input.setInputType(
-                InputType.TYPE_CLASS_NUMBER
+        root.setOrientation(
+                LinearLayout.VERTICAL
         );
 
-        input.setHint(
-                "مثال: 30"
+        root.setPadding(
+                dp(18),
+                dp(14),
+                dp(18),
+                dp(18)
         );
 
-        input.setText(
-                String.valueOf(
-                        prefs.getLong(
-                                "minutes",
-                                30
-                        )
+        root.setBackgroundColor(
+                BG
+        );
+
+        TextView title =
+                label(
+                        "⚙️  الإعدادات",
+                        GREEN,
+                        26,
+                        true
+                );
+
+        title.setGravity(
+                Gravity.CENTER
+        );
+
+        root.addView(
+                title,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(60)
                 )
         );
 
-        input.setSelectAllOnFocus(
-                true
+        TextView description =
+                label(
+                        "تذكيرات أذكار الصباح والمساء",
+                        MUTED,
+                        14,
+                        false
+                );
+
+        description.setGravity(
+                Gravity.CENTER
+        );
+
+        description.setPadding(
+                0,
+                0,
+                0,
+                dp(12)
+        );
+
+        root.addView(
+                description
+        );
+
+        /*
+         * الصباح
+         */
+        LinearLayout morningCard =
+                reminderCard(
+                        "🌅  أذكار الصباح",
+                        ReminderScheduler.TYPE_MORNING
+                );
+
+        root.addView(
+                morningCard
+        );
+
+        /*
+         * المساء
+         */
+        LinearLayout eveningCard =
+                reminderCard(
+                        "🌆  أذكار المساء",
+                        ReminderScheduler.TYPE_EVENING
+                );
+
+        LinearLayout.LayoutParams eveningParams =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -2
+                );
+
+        eveningParams.setMargins(
+                0,
+                dp(10),
+                0,
+                0
+        );
+
+        root.addView(
+                eveningCard,
+                eveningParams
+        );
+
+        TextView info =
+                label(
+                        "ملاحظة: قد يؤخر Android التنبيه قليلًا لتوفير البطارية.",
+                        MUTED,
+                        11,
+                        false
+                );
+
+        info.setGravity(
+                Gravity.CENTER
+        );
+
+        info.setPadding(
+                dp(8),
+                dp(15),
+                dp(8),
+                dp(10)
+        );
+
+        root.addView(
+                info
+        );
+
+        Button back =
+                createActionButton(
+                        "‹  العودة للرئيسية"
+                );
+
+        root.addView(
+                back,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(54)
+                )
+        );
+
+        back.setOnClickListener(
+                v -> showHome()
+        );
+
+        setContentView(root);
+    }
+
+    /*
+     * بطاقة إعداد تنبيه
+     */
+    private LinearLayout reminderCard(
+            String title,
+            String type
+    ) {
+
+        boolean morning =
+                ReminderScheduler.TYPE_MORNING.equals(
+                        type
+                );
+
+        boolean enabled =
+                prefs.getBoolean(
+                        morning
+                                ? MORNING_ENABLED
+                                : EVENING_ENABLED,
+                        true
+                );
+
+        int hour =
+                prefs.getInt(
+                        morning
+                                ? MORNING_HOUR
+                                : EVENING_HOUR,
+                        morning ? 6 : 17
+                );
+
+        int minute =
+                prefs.getInt(
+                        morning
+                                ? MORNING_MINUTE
+                                : EVENING_MINUTE,
+                        0
+                );
+
+        LinearLayout card =
+                new LinearLayout(this);
+
+        card.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        card.setPadding(
+                dp(16),
+                dp(14),
+                dp(16),
+                dp(14)
+        );
+
+        card.setBackgroundResource(
+                R.drawable.card_bg
+        );
+
+        TextView name =
+                label(
+                        title,
+                        WHITE,
+                        19,
+                        true
+                );
+
+        name.setGravity(
+                Gravity.CENTER
+        );
+
+        card.addView(
+                name
+        );
+
+        TextView time =
+                label(
+                        formatTime(
+                                hour,
+                                minute
+                        ),
+                        CYAN,
+                        25,
+                        true
+                );
+
+        time.setGravity(
+                Gravity.CENTER
+        );
+
+        time.setPadding(
+                0,
+                dp(8),
+                0,
+                dp(8)
+        );
+
+        card.addView(
+                time
+        );
+
+        TextView state =
+                label(
+                        enabled
+                                ? "🟢 مفعّل"
+                                : "⚪ متوقف",
+                        enabled
+                                ? GREEN
+                                : MUTED,
+                        14,
+                        true
+                );
+
+        state.setGravity(
+                Gravity.CENTER
+        );
+
+        card.addView(
+                state
+        );
+
+        LinearLayout buttons =
+                new LinearLayout(this);
+
+        buttons.setGravity(
+                Gravity.CENTER
+        );
+
+        Button toggle =
+                new Button(this);
+
+        toggle.setText(
+                enabled
+                        ? "إيقاف"
+                        : "تشغيل"
+        );
+
+        toggle.setTextSize(
+                14
+        );
+
+        toggle.setAllCaps(
+                false
+        );
+
+        toggle.setTextColor(
+                enabled
+                        ? RED
+                        : GREEN
+        );
+
+        toggle.setBackgroundResource(
+                R.drawable.card_bg
+        );
+
+        Button change =
+                createActionButton(
+                        "تغيير الوقت"
+                );
+
+        LinearLayout.LayoutParams buttonParams =
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(50),
+                        1
+                );
+
+        buttonParams.setMargins(
+                dp(3),
+                0,
+                dp(3),
+                0
+        );
+
+        buttons.addView(
+                toggle,
+                buttonParams
+        );
+
+        buttons.addView(
+                change,
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(50),
+                        1
+                )
+        );
+
+        card.addView(
+                buttons
+        );
+
+        toggle.setOnClickListener(
+                v -> {
+
+                    boolean current =
+                            prefs.getBoolean(
+                                    morning
+                                            ? MORNING_ENABLED
+                                            : EVENING_ENABLED,
+                                    true
+                            );
+
+                    boolean newValue =
+                            !current;
+
+                    prefs.edit()
+                            .putBoolean(
+                                    morning
+                                            ? MORNING_ENABLED
+                                            : EVENING_ENABLED,
+                                    newValue
+                            )
+                            .apply();
+
+                    if (newValue) {
+
+                        ReminderScheduler.schedule(
+                                this,
+                                type,
+                                prefs.getInt(
+                                        morning
+                                                ? MORNING_HOUR
+                                                : EVENING_HOUR,
+                                        morning ? 6 : 17
+                                ),
+                                prefs.getInt(
+                                        morning
+                                                ? MORNING_MINUTE
+                                                : EVENING_MINUTE,
+                                        0
+                                )
+                        );
+
+                    } else {
+
+                        if (morning) {
+                            ReminderScheduler.cancelMorning(
+                                    this
+                            );
+                        } else {
+                            ReminderScheduler.cancelEvening(
+                                    this
+                            );
+                        }
+                    }
+
+                    settings();
+                }
+        );
+
+        change.setOnClickListener(
+                v -> chooseReminderTime(
+                        type
+                )
+        );
+
+        return card;
+    }
+
+    /*
+     * تغيير وقت التنبيه
+     */
+    private void chooseReminderTime(
+            String type
+    ) {
+
+        boolean morning =
+                ReminderScheduler.TYPE_MORNING.equals(
+                        type
+                );
+
+        int hour =
+                prefs.getInt(
+                        morning
+                                ? MORNING_HOUR
+                                : EVENING_HOUR,
+                        morning ? 6 : 17
+                );
+
+        int minute =
+                prefs.getInt(
+                        morning
+                                ? MORNING_MINUTE
+                                : EVENING_MINUTE,
+                        0
+                );
+
+        TimePicker picker =
+                new TimePicker(this);
+
+        picker.setIs24HourView(
+                false
+        );
+
+        picker.setHour(
+                hour
+        );
+
+        picker.setMinute(
+                minute
         );
 
         new AlertDialog.Builder(this)
-
                 .setTitle(
-                        "🔔 إعداد التذكيرات"
+                        morning
+                                ? "وقت أذكار الصباح"
+                                : "وقت أذكار المساء"
                 )
-
-                .setMessage(
-                        "حدد عدد الدقائق بين كل تذكير."
-                )
-
-                .setView(input)
-
+                .setView(picker)
                 .setPositiveButton(
                         "حفظ",
                         (dialog, which) -> {
 
-                            try {
+                            int selectedHour =
+                                    picker.getHour();
 
-                                long minutes =
-                                        Long.parseLong(
-                                                input.getText()
-                                                        .toString()
-                                                        .trim()
-                                        );
+                            int selectedMinute =
+                                    picker.getMinute();
 
-                                if (minutes < 1) {
-                                    minutes = 1;
-                                }
+                            SharedPreferences.Editor editor =
+                                    prefs.edit();
 
-                                prefs.edit()
-                                        .putBoolean(
-                                                "enabled",
-                                                true
-                                        )
-                                        .putLong(
-                                                "minutes",
-                                                minutes
-                                        )
-                                        .apply();
+                            if (morning) {
+
+                                editor.putInt(
+                                        MORNING_HOUR,
+                                        selectedHour
+                                );
+
+                                editor.putInt(
+                                        MORNING_MINUTE,
+                                        selectedMinute
+                                );
+
+                            } else {
+
+                                editor.putInt(
+                                        EVENING_HOUR,
+                                        selectedHour
+                                );
+
+                                editor.putInt(
+                                        EVENING_MINUTE,
+                                        selectedMinute
+                                );
+                            }
+
+                            editor.apply();
+
+                            boolean enabled =
+                                    prefs.getBoolean(
+                                            morning
+                                                    ? MORNING_ENABLED
+                                                    : EVENING_ENABLED,
+                                            true
+                                    );
+
+                            if (enabled) {
 
                                 ReminderScheduler.schedule(
                                         this,
-                                        minutes
+                                        type,
+                                        selectedHour,
+                                        selectedMinute
                                 );
-
-                                refresh();
-
-                                Toast.makeText(
-                                        this,
-                                        "تم تفعيل التذكيرات",
-                                        Toast.LENGTH_SHORT
-                                ).show();
-
-                            } catch (Exception e) {
-
-                                Toast.makeText(
-                                        this,
-                                        "أدخل رقمًا صحيحًا",
-                                        Toast.LENGTH_SHORT
-                                ).show();
                             }
+
+                            settings();
+
+                            Toast.makeText(
+                                    this,
+                                    "تم حفظ وقت التذكير",
+                                    Toast.LENGTH_SHORT
+                            ).show();
                         }
                 )
-
-                .setNeutralButton(
-                        "إيقاف",
-                        (dialog, which) -> {
-
-                            prefs.edit()
-                                    .putBoolean(
-                                            "enabled",
-                                            false
-                                    )
-                                    .apply();
-
-                            ReminderScheduler.cancel(
-                                    this
-                            );
-
-                            refresh();
-                        }
-                )
-
                 .setNegativeButton(
                         "إلغاء",
                         null
                 )
-
                 .show();
+    }
+
+    /*
+     * مواعيد الصلاة
+     *
+     * الواجهة الأولية فقط.
+     * سيتم ربطها بحساب الموقع ومواقيت الصلاة في المرحلة التالية.
+     */
+    private void prayerTimes() {
+
+        LinearLayout root =
+                new LinearLayout(this);
+
+        root.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        root.setGravity(
+                Gravity.CENTER
+        );
+
+        root.setPadding(
+                dp(20),
+                dp(20),
+                dp(20),
+                dp(20)
+        );
+
+        root.setBackgroundColor(
+                BG
+        );
+
+        TextView title =
+                label(
+                        "🕌  مواعيد الصلاة",
+                        GREEN,
+                        27,
+                        true
+                );
+
+        title.setGravity(
+                Gravity.CENTER
+        );
+
+        root.addView(
+                title,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(70)
+                )
+        );
+
+        TextView message =
+                label(
+                        "سيتم هنا عرض مواقيت الفجر والظهر والعصر والمغرب والعشاء حسب موقعك الجغرافي.",
+                        WHITE,
+                        17,
+                        false
+                );
+
+        message.setGravity(
+                Gravity.CENTER
+        );
+
+        message.setLineSpacing(
+                dp(5),
+                1.15f
+        );
+
+        root.addView(
+                message,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        0,
+                        1
+                )
+        );
+
+        TextView method =
+                label(
+                        "حساب المواقيت محليًا دون API مدفوع.",
+                        MUTED,
+                        13,
+                        false
+                );
+
+        method.setGravity(
+                Gravity.CENTER
+        );
+
+        root.addView(
+                method
+        );
+
+        Button back =
+                createActionButton(
+                        "‹  العودة للرئيسية"
+                );
+
+        LinearLayout.LayoutParams backParams =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(56)
+                );
+
+        backParams.setMargins(
+                0,
+                dp(18),
+                0,
+                0
+        );
+
+        root.addView(
+                back,
+                backParams
+        );
+
+        back.setOnClickListener(
+                v -> showHome()
+        );
+
+        setContentView(root);
     }
 
     /*
@@ -1695,8 +2329,8 @@ public class MainActivity extends Activity {
         root.addView(
                 icon,
                 new LinearLayout.LayoutParams(
-                        dp(100),
-                        dp(100)
+                        dp(90),
+                        dp(90)
                 )
         );
 
@@ -1704,7 +2338,7 @@ public class MainActivity extends Activity {
                 label(
                         "وذكر",
                         GREEN,
-                        32,
+                        31,
                         true
                 );
 
@@ -1712,7 +2346,9 @@ public class MainActivity extends Activity {
                 Gravity.CENTER
         );
 
-        root.addView(title);
+        root.addView(
+                title
+        );
 
         TextView version =
                 label(
@@ -1730,10 +2366,12 @@ public class MainActivity extends Activity {
                 0,
                 dp(4),
                 0,
-                dp(20)
+                dp(18)
         );
 
-        root.addView(version);
+        root.addView(
+                version
+        );
 
         TextView developer =
                 label(
@@ -1765,9 +2403,9 @@ public class MainActivity extends Activity {
 
         telegram.setPadding(
                 0,
-                dp(20),
+                dp(18),
                 0,
-                dp(20)
+                dp(18)
         );
 
         root.addView(
@@ -1787,7 +2425,9 @@ public class MainActivity extends Activity {
                                         )
                                 );
 
-                        startActivity(intent);
+                        startActivity(
+                                intent
+                        );
 
                     } catch (Exception ignored) {
                     }
@@ -1795,32 +2435,9 @@ public class MainActivity extends Activity {
         );
 
         Button back =
-                new Button(this);
-
-        back.setText(
-                "‹  العودة للرئيسية"
-        );
-
-        back.setTextColor(
-                BG
-        );
-
-        back.setTextSize(
-                16
-        );
-
-        back.setAllCaps(
-                false
-        );
-
-        back.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
-
-        back.setBackgroundResource(
-                R.drawable.neon_button
-        );
+                createActionButton(
+                        "‹  العودة للرئيسية"
+                );
 
         root.addView(
                 back,
@@ -1838,7 +2455,7 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * زر الرجوع في أندرويد
+     * زر أندرويد للرجوع
      */
     @Override
     public void onBackPressed() {
@@ -1850,11 +2467,11 @@ public class MainActivity extends Activity {
             return;
         }
 
-        confirmExit();
+        showHome();
     }
 
     /*
-     * تسجيل ذكر مكتمل في الحصيلة اليومية
+     * تسجيل ذكر مكتمل
      */
     public static void recordDhikr(
             Context context
@@ -1862,7 +2479,7 @@ public class MainActivity extends Activity {
 
         SharedPreferences p =
                 context.getSharedPreferences(
-                        "settings",
+                        PREFS,
                         Context.MODE_PRIVATE
                 );
 
@@ -1903,6 +2520,44 @@ public class MainActivity extends Activity {
     }
 
     /*
+     * إنشاء زر موحد
+     */
+    private Button createActionButton(
+            String text
+    ) {
+
+        Button button =
+                new Button(this);
+
+        button.setText(
+                text
+        );
+
+        button.setTextColor(
+                BG
+        );
+
+        button.setTextSize(
+                15
+        );
+
+        button.setAllCaps(
+                false
+        );
+
+        button.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+        );
+
+        button.setBackgroundResource(
+                R.drawable.neon_button
+        );
+
+        return button;
+    }
+
+    /*
      * تنسيق تقدم التكرار
      */
     private String progress(
@@ -1914,6 +2569,49 @@ public class MainActivity extends Activity {
                 current +
                 " / " +
                 target;
+    }
+
+    /*
+     * تنسيق الوقت
+     */
+    private String formatTime(
+            int hour,
+            int minute
+    ) {
+
+        Calendar calendar =
+                Calendar.getInstance();
+
+        calendar.set(
+                Calendar.HOUR_OF_DAY,
+                hour
+        );
+
+        calendar.set(
+                Calendar.MINUTE,
+                minute
+        );
+
+        SimpleDateFormat format =
+                new SimpleDateFormat(
+                        "h:mm a",
+                        Locale.getDefault()
+                );
+
+        String result =
+                format.format(
+                        calendar.getTime()
+                );
+
+        return result
+                .replace(
+                        "AM",
+                        "ص"
+                )
+                .replace(
+                        "PM",
+                        "م"
+                );
     }
 
     /*
@@ -1929,11 +2627,17 @@ public class MainActivity extends Activity {
         TextView t =
                 new TextView(this);
 
-        t.setText(text);
+        t.setText(
+                text
+        );
 
-        t.setTextColor(color);
+        t.setTextColor(
+                color
+        );
 
-        t.setTextSize(size);
+        t.setTextSize(
+                size
+        );
 
         t.setGravity(
                 Gravity.CENTER_VERTICAL
@@ -1946,7 +2650,9 @@ public class MainActivity extends Activity {
                         : Typeface.NORMAL
         );
 
-        t.setIncludeFontPadding(true);
+        t.setIncludeFontPadding(
+                true
+        );
 
         return t;
     }
@@ -1954,7 +2660,9 @@ public class MainActivity extends Activity {
     /*
      * تحويل dp إلى px
      */
-    private int dp(int value) {
+    private int dp(
+            int value
+    ) {
 
         return Math.round(
                 value *
