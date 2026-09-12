@@ -20,16 +20,65 @@ public final class ReminderScheduler {
     }
 
     public static void scheduleAll(Context context) {
+
         scheduleMorning(context);
         scheduleEvening(context);
     }
 
     public static void scheduleMorning(Context context) {
-        schedule(context, TYPE_MORNING, 6, 0);
+
+        android.content.SharedPreferences prefs =
+                context.getSharedPreferences(
+                        "settings",
+                        Context.MODE_PRIVATE
+                );
+
+        int hour =
+                prefs.getInt(
+                        "morning_hour",
+                        6
+                );
+
+        int minute =
+                prefs.getInt(
+                        "morning_minute",
+                        0
+                );
+
+        schedule(
+                context,
+                TYPE_MORNING,
+                hour,
+                minute
+        );
     }
 
     public static void scheduleEvening(Context context) {
-        schedule(context, TYPE_EVENING, 17, 0);
+
+        android.content.SharedPreferences prefs =
+                context.getSharedPreferences(
+                        "settings",
+                        Context.MODE_PRIVATE
+                );
+
+        int hour =
+                prefs.getInt(
+                        "evening_hour",
+                        17
+                );
+
+        int minute =
+                prefs.getInt(
+                        "evening_minute",
+                        0
+                );
+
+        schedule(
+                context,
+                TYPE_EVENING,
+                hour,
+                minute
+        );
     }
 
     public static void schedule(
@@ -54,7 +103,10 @@ public final class ReminderScheduler {
                         : EVENING_REQUEST_CODE;
 
         Intent intent =
-                new Intent(context, ReminderReceiver.class);
+                new Intent(
+                        context,
+                        ReminderReceiver.class
+                );
 
         intent.setAction(
                 "com.saleh.wadhkur.REMINDER_" + type
@@ -74,7 +126,8 @@ public final class ReminderScheduler {
                                 | PendingIntent.FLAG_IMMUTABLE
                 );
 
-        Calendar next = Calendar.getInstance();
+        Calendar next =
+                Calendar.getInstance();
 
         next.set(
                 Calendar.HOUR_OF_DAY,
@@ -126,7 +179,10 @@ public final class ReminderScheduler {
         }
     }
 
-    public static void cancelMorning(Context context) {
+    public static void cancelMorning(
+            Context context
+    ) {
+
         cancel(
                 context,
                 TYPE_MORNING,
@@ -134,7 +190,10 @@ public final class ReminderScheduler {
         );
     }
 
-    public static void cancelEvening(Context context) {
+    public static void cancelEvening(
+            Context context
+    ) {
+
         cancel(
                 context,
                 TYPE_EVENING,
@@ -142,7 +201,10 @@ public final class ReminderScheduler {
         );
     }
 
-    public static void cancelAll(Context context) {
+    public static void cancelAll(
+            Context context
+    ) {
+
         cancelMorning(context);
         cancelEvening(context);
     }
