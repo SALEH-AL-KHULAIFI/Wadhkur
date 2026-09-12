@@ -19,6 +19,12 @@ public class BootReceiver extends BroadcastReceiver {
         String action =
                 intent.getAction();
 
+        /*
+         * إعادة جدولة التنبيهات في حالتين:
+         *
+         * 1. بعد إعادة تشغيل الهاتف.
+         * 2. بعد تحديث التطبيق.
+         */
         if (
                 !Intent.ACTION_BOOT_COMPLETED.equals(action)
                         &&
@@ -27,40 +33,19 @@ public class BootReceiver extends BroadcastReceiver {
             return;
         }
 
-        android.content.SharedPreferences prefs =
-                context.getSharedPreferences(
-                        "settings",
-                        Context.MODE_PRIVATE
-                );
-
-        boolean morningEnabled =
-                prefs.getBoolean(
-                        "morning_enabled",
-                        true
-                );
-
-        boolean eveningEnabled =
-                prefs.getBoolean(
-                        "evening_enabled",
-                        true
-                );
-
         /*
-         * ReminderScheduler يقرأ الوقت المحفوظ
-         * من SharedPreferences.
+         * ReminderScheduler يقرأ بنفسه حالة
+         * كل نوع من SharedPreferences:
+         *
+         * general_enabled
+         * morning_enabled
+         * evening_enabled
+         *
+         * لذلك نستخدم scheduleAll()
+         * حتى تتم إعادة جميع التنبيهات المفعلة.
          */
-        if (morningEnabled) {
-
-            ReminderScheduler.scheduleMorning(
-                    context
-            );
-        }
-
-        if (eveningEnabled) {
-
-            ReminderScheduler.scheduleEvening(
-                    context
-            );
-        }
+        ReminderScheduler.scheduleAll(
+                context
+        );
     }
 }
