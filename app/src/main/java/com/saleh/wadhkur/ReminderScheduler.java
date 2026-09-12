@@ -1,5 +1,190 @@
 package com.saleh.wadhkur;
-import android.app.*;import android.content.*;import android.os.SystemClock;
-public final class ReminderScheduler{private static final int REQUEST=7711;private ReminderScheduler(){}
- public static void schedule(Context c,long m){cancel(c);AlarmManager a=(AlarmManager)c.getSystemService(Context.ALARM_SERVICE);if(a==null)return;long x=Math.max(1,Math.min(60,m))*60000L;Intent i=new Intent(c,ReminderReceiver.class);PendingIntent p=PendingIntent.getBroadcast(c,REQUEST,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);a.setInexactRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,SystemClock.elapsedRealtime()+x,x,p);}
- public static void cancel(Context c){AlarmManager a=(AlarmManager)c.getSystemService(Context.ALARM_SERVICE);if(a==null)return;Intent i=new Intent(c,ReminderReceiver.class);PendingIntent p=PendingIntent.getBroadcast(c,REQUEST,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);a.cancel(p);p.cancel();}}
+
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
+
+import java.util.Calendar;
+
+public final class ReminderScheduler {
+
+    public static final String TYPE_MORNING = "morning";
+    public static final String TYPE_EVENING = "evening";
+
+    private static final int MORNING_REQUEST_CODE = 7701;
+    private static final int EVENING_REQUEST_CODE = 7702;
+
+    private ReminderScheduler() {
+    }
+
+    public static void scheduleAll(Context context) {
+        scheduleMorning(context);
+        scheduleEvening(context);
+    }
+
+    public static void scheduleMorning(Context context) {
+        schedule(context, TYPE_MORNING, 6, 0);
+    }
+
+    public static void scheduleEvening(Context context) {
+        schedule(context, TYPE_EVENING, 17, 0);
+    }
+
+    public static void schedule(
+            Context context,
+            String type,
+            int hour,
+            int minute
+    ) {
+
+        AlarmManager alarmManager =
+                (AlarmManager) context.getSystemService(
+                        Context.ALARM_SERVICE
+                );
+
+        if (alarmManager == null) {
+            return;
+        }
+
+        int requestCode =
+                TYPE_MORNING.equals(type)
+                        ? MORNING_REQUEST_CODE
+                        : EVENING_REQUEST_CODE;
+
+        Intent intent =
+                new Intent(context, ReminderReceiver.class);
+
+        intent.setAction(
+                "com.saleh.wadhkur.REMINDER_" + type
+        );
+
+        intent.putExtra(
+                ReminderReceiver.EXTRA_TYPE,
+                type
+        );
+
+        PendingIntent pendingIntent =
+                PendingIntent.getBroadcast(
+                        context,
+                        requestCode,
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                                | PendingIntent.FLAG_IMMUTABLE
+                );
+
+        Calendar next = Calendar.getInstance();
+
+        next.set(
+                Calendar.HOUR_OF_DAY,
+                hour
+        );
+
+        next.set(
+                Calendar.MINUTE,
+                minute
+        );
+
+        next.set(
+                Calendar.SECOND,
+                0
+        );
+
+        next.set(
+                Calendar.MILLISECOND,
+                0
+        );
+
+        if (next.getTimeInMillis()
+                <= System.currentTimeMillis()) {
+
+            next.add(
+                    Calendar.DAY_OF_YEAR,
+                    1
+            );
+        }
+
+        long trigger =
+                next.getTimeInMillis();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+
+            alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    trigger,
+                    pendingIntent
+            );
+
+        } else {
+
+            alarmManager.set(
+                    AlarmManager.RTC_WAKEUP,
+                    trigger,
+                    pendingIntent
+            );
+        }
+    }
+
+    public static void cancelMorning(Context context) {
+        cancel(
+                context,
+                TYPE_MORNING,
+                MORNING_REQUEST_CODE
+        );
+    }
+
+    public static void cancelEvening(Context context) {
+        cancel(
+                context,
+                TYPE_EVENING,
+                EVENING_REQUEST_CODE
+        );
+    }
+
+    public static void cancelAll(Context context) {
+        cancelMorning(context);
+        cancelEvening(context);
+    }
+
+    private static void cancel(
+            Context context,
+            String type,
+            int requestCode
+    ) {
+
+        AlarmManager alarmManager =
+                (AlarmManager) context.getSystemService(
+                        Context.ALARM_SERVICE
+                );
+
+        if (alarmManager == null) {
+            return;
+        }
+
+        Intent intent =
+                new Intent(
+                        context,
+                        ReminderReceiver.class
+                );
+
+        intent.setAction(
+                "com.saleh.wadhkur.REMINDER_" + type
+        );
+
+        PendingIntent pendingIntent =
+                PendingIntent.getBroadcast(
+                        context,
+                        requestCode,
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                                | PendingIntent.FLAG_IMMUTABLE
+                );
+
+        alarmManager.cancel(
+                pendingIntent
+        );
+
+        pendingIntent.cancel();
+    }
+}
