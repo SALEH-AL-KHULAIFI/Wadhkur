@@ -27,6 +27,7 @@ public class MainActivity extends Activity {
     private static final int RED = Color.rgb(255, 85, 105);
 
     private SharedPreferences prefs;
+
     private TextView countText;
     private TextView statusText;
 
@@ -42,36 +43,53 @@ public class MainActivity extends Activity {
     private Button dhikrActionButton;
 
     private int currentRepeat = 0;
+
     private float downX;
     private float downY;
 
-    private Handler countdownHandler = new Handler(Looper.getMainLooper());
+    private Handler countdownHandler =
+            new Handler(Looper.getMainLooper());
+
     private TextView ramadanCountdownText;
 
-    private final Runnable countdownRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (ramadanCountdownText != null) {
-                updateRamadanCountdown();
-                countdownHandler.postDelayed(this, 1000);
-            }
-        }
-    };
+    private final Runnable countdownRunnable =
+            new Runnable() {
+                @Override
+                public void run() {
+
+                    if (ramadanCountdownText != null) {
+
+                        updateRamadanCountdown();
+
+                        countdownHandler.postDelayed(
+                                this,
+                                1000
+                        );
+                    }
+                }
+            };
 
     @Override
     public void onCreate(Bundle b) {
+
         super.onCreate(b);
 
-        prefs = getSharedPreferences("settings", MODE_PRIVATE);
+        prefs = getSharedPreferences(
+                "settings",
+                MODE_PRIVATE
+        );
 
         showHome();
 
         if (Build.VERSION.SDK_INT >= 33 &&
-                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                        != PackageManager.PERMISSION_GRANTED) {
+                checkSelfPermission(
+                        Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED) {
 
             requestPermissions(
-                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    new String[]{
+                            Manifest.permission.POST_NOTIFICATIONS
+                    },
                     44
             );
         }
@@ -79,42 +97,92 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        countdownHandler.removeCallbacks(countdownRunnable);
+
+        countdownHandler.removeCallbacks(
+                countdownRunnable
+        );
+
         super.onDestroy();
     }
 
+    /*
+     * الصفحة الرئيسية
+     */
     private void showHome() {
 
-        setContentView(R.layout.activity_main);
+        /*
+         * مهم جدًا:
+         * عند الرجوع للرئيسية لا تبقى المجموعة السابقة
+         * فعالة حتى لا يتعارض زر الرجوع.
+         */
+        currentData = null;
+        currentTitle = null;
+        currentIndex = 0;
+        currentRepeat = 0;
 
-        countText = findViewById(R.id.countText);
-        statusText = findViewById(R.id.statusText);
-
-        findViewById(R.id.morningBtn).setOnClickListener(
-                v -> section("🌅 أذكار الصباح", DhikrData.MORNING)
+        setContentView(
+                R.layout.activity_main
         );
 
-        findViewById(R.id.eveningBtn).setOnClickListener(
-                v -> section("🌆 أذكار المساء", DhikrData.EVENING)
+        countText = findViewById(
+                R.id.countText
         );
 
-        findViewById(R.id.duasBtn).setOnClickListener(
-                v -> section("🤲 الأدعية", DhikrData.DUAS)
+        statusText = findViewById(
+                R.id.statusText
         );
 
-        findViewById(R.id.surasBtn).setOnClickListener(
-                v -> section("📖 السور والآيات", DhikrData.SURAS)
+        findViewById(
+                R.id.morningBtn
+        ).setOnClickListener(
+                v -> section(
+                        "🌅 أذكار الصباح",
+                        DhikrData.MORNING
+                )
         );
 
-        findViewById(R.id.tasbeehBtn).setOnClickListener(
+        findViewById(
+                R.id.eveningBtn
+        ).setOnClickListener(
+                v -> section(
+                        "🌆 أذكار المساء",
+                        DhikrData.EVENING
+                )
+        );
+
+        findViewById(
+                R.id.duasBtn
+        ).setOnClickListener(
+                v -> section(
+                        "🤲 الأدعية",
+                        DhikrData.DUAS
+                )
+        );
+
+        findViewById(
+                R.id.surasBtn
+        ).setOnClickListener(
+                v -> section(
+                        "📖 السور والآيات",
+                        DhikrData.SURAS
+                )
+        );
+
+        findViewById(
+                R.id.tasbeehBtn
+        ).setOnClickListener(
                 v -> tasbeeh()
         );
 
-        findViewById(R.id.settingsBtn).setOnClickListener(
+        findViewById(
+                R.id.settingsBtn
+        ).setOnClickListener(
                 v -> settings()
         );
 
-        findViewById(R.id.aboutBtn).setOnClickListener(
+        findViewById(
+                R.id.aboutBtn
+        ).setOnClickListener(
                 v -> about()
         );
 
@@ -125,41 +193,57 @@ public class MainActivity extends Activity {
         addExitButton();
     }
 
+    /*
+     * عداد رمضان
+     */
     private void addRamadanCountdown() {
 
-        try {
-
-            ScrollView scroll = findViewById(android.R.id.content)
-                    .findViewById(android.R.id.content);
-
-        } catch (Exception ignored) {
-        }
-
-        View content = ((ViewGroup) findViewById(android.R.id.content)).getChildAt(0);
+        View content =
+                ((ViewGroup) findViewById(
+                        android.R.id.content
+                )).getChildAt(0);
 
         if (!(content instanceof ScrollView)) {
             return;
         }
 
-        ScrollView scrollView = (ScrollView) content;
+        ScrollView scrollView =
+                (ScrollView) content;
 
-        if (!(scrollView.getChildAt(0) instanceof LinearLayout)) {
+        if (!(scrollView.getChildAt(0)
+                instanceof LinearLayout)) {
+
             return;
         }
 
-        LinearLayout root = (LinearLayout) scrollView.getChildAt(0);
+        LinearLayout root =
+                (LinearLayout) scrollView.getChildAt(0);
 
-        LinearLayout ramadanCard = new LinearLayout(this);
-        ramadanCard.setOrientation(LinearLayout.VERTICAL);
-        ramadanCard.setGravity(Gravity.CENTER);
+        LinearLayout ramadanCard =
+                new LinearLayout(this);
+
+        ramadanCard.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        ramadanCard.setGravity(
+                Gravity.CENTER
+        );
+
         ramadanCard.setPadding(
                 dp(16),
                 dp(13),
                 dp(16),
                 dp(13)
         );
-        ramadanCard.setBackgroundColor(Color.rgb(7, 24, 30));
-        ramadanCard.setElevation(dp(5));
+
+        ramadanCard.setBackgroundResource(
+                R.drawable.card_bg
+        );
+
+        ramadanCard.setElevation(
+                dp(5)
+        );
 
         LinearLayout.LayoutParams cardParams =
                 new LinearLayout.LayoutParams(
@@ -174,27 +258,36 @@ public class MainActivity extends Activity {
                 dp(2)
         );
 
-        ramadanCard.setLayoutParams(cardParams);
-
-        TextView title = label(
-                "🌙  العد التنازلي لرمضان 1448",
-                GREEN,
-                17,
-                true
+        ramadanCard.setLayoutParams(
+                cardParams
         );
 
-        title.setGravity(Gravity.CENTER);
+        TextView title =
+                label(
+                        "🌙  العد التنازلي لرمضان 1448",
+                        GREEN,
+                        17,
+                        true
+                );
+
+        title.setGravity(
+                Gravity.CENTER
+        );
 
         ramadanCard.addView(title);
 
-        ramadanCountdownText = label(
-                "جاري الحساب...",
-                CYAN,
-                22,
-                true
+        ramadanCountdownText =
+                label(
+                        "جاري الحساب...",
+                        CYAN,
+                        22,
+                        true
+                );
+
+        ramadanCountdownText.setGravity(
+                Gravity.CENTER
         );
 
-        ramadanCountdownText.setGravity(Gravity.CENTER);
         ramadanCountdownText.setPadding(
                 0,
                 dp(6),
@@ -202,25 +295,42 @@ public class MainActivity extends Activity {
                 dp(3)
         );
 
-        ramadanCard.addView(ramadanCountdownText);
-
-        TextView note = label(
-                "الموعد المتوقع: 8 فبراير 2027 • قد يختلف حسب رؤية الهلال",
-                MUTED,
-                11,
-                false
+        ramadanCard.addView(
+                ramadanCountdownText
         );
 
-        note.setGravity(Gravity.CENTER);
+        TextView note =
+                label(
+                        "الموعد المتوقع: 8 فبراير 2027 • قد يختلف حسب رؤية الهلال",
+                        MUTED,
+                        11,
+                        false
+                );
+
+        note.setGravity(
+                Gravity.CENTER
+        );
 
         ramadanCard.addView(note);
 
-        root.addView(ramadanCard, 1);
+        /*
+         * يوضع العداد بعد الهيدر مباشرة.
+         */
+        root.addView(
+                ramadanCard,
+                1
+        );
 
         updateRamadanCountdown();
 
-        countdownHandler.removeCallbacks(countdownRunnable);
-        countdownHandler.postDelayed(countdownRunnable, 1000);
+        countdownHandler.removeCallbacks(
+                countdownRunnable
+        );
+
+        countdownHandler.postDelayed(
+                countdownRunnable,
+                1000
+        );
     }
 
     private void updateRamadanCountdown() {
@@ -229,12 +339,26 @@ public class MainActivity extends Activity {
             return;
         }
 
-        Calendar target = Calendar.getInstance();
-        target.set(2027, Calendar.FEBRUARY, 8, 0, 0, 0);
-        target.set(Calendar.MILLISECOND, 0);
+        Calendar target =
+                Calendar.getInstance();
 
-        long difference = target.getTimeInMillis()
-                - System.currentTimeMillis();
+        target.set(
+                2027,
+                Calendar.FEBRUARY,
+                8,
+                0,
+                0,
+                0
+        );
+
+        target.set(
+                Calendar.MILLISECOND,
+                0
+        );
+
+        long difference =
+                target.getTimeInMillis()
+                        - System.currentTimeMillis();
 
         if (difference <= 0) {
 
@@ -245,53 +369,86 @@ public class MainActivity extends Activity {
             return;
         }
 
-        long totalSeconds = difference / 1000;
+        long totalSeconds =
+                difference / 1000;
 
-        long days = totalSeconds / 86400;
+        long days =
+                totalSeconds / 86400;
+
         totalSeconds %= 86400;
 
-        long hours = totalSeconds / 3600;
+        long hours =
+                totalSeconds / 3600;
+
         totalSeconds %= 3600;
 
-        long minutes = totalSeconds / 60;
-        long seconds = totalSeconds % 60;
+        long minutes =
+                totalSeconds / 60;
+
+        long seconds =
+                totalSeconds % 60;
 
         ramadanCountdownText.setText(
                 "باقي " +
                         days +
                         " يوم  •  " +
-                        String.format(Locale.US, "%02d:%02d:%02d",
+                        String.format(
+                                Locale.US,
+                                "%02d:%02d:%02d",
                                 hours,
                                 minutes,
-                                seconds)
+                                seconds
+                        )
         );
     }
 
+    /*
+     * زر الخروج
+     */
     private void addExitButton() {
 
         View content =
-                ((ViewGroup) findViewById(android.R.id.content)).getChildAt(0);
+                ((ViewGroup) findViewById(
+                        android.R.id.content
+                )).getChildAt(0);
 
         if (!(content instanceof ScrollView)) {
             return;
         }
 
-        ScrollView scrollView = (ScrollView) content;
+        ScrollView scrollView =
+                (ScrollView) content;
 
-        if (!(scrollView.getChildAt(0) instanceof LinearLayout)) {
+        if (!(scrollView.getChildAt(0)
+                instanceof LinearLayout)) {
+
             return;
         }
 
-        LinearLayout root = (LinearLayout) scrollView.getChildAt(0);
+        LinearLayout root =
+                (LinearLayout) scrollView.getChildAt(0);
 
-        Button exit = new Button(this);
+        Button exit =
+                new Button(this);
 
-        exit.setText("⏻  خروج من التطبيق");
+        exit.setText(
+                "⏻  خروج من التطبيق"
+        );
+
         exit.setTextColor(RED);
+
         exit.setTextSize(15);
+
         exit.setAllCaps(false);
-        exit.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        exit.setBackgroundResource(R.drawable.card_bg);
+
+        exit.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+        );
+
+        exit.setBackgroundResource(
+                R.drawable.card_bg
+        );
 
         LinearLayout.LayoutParams params =
                 new LinearLayout.LayoutParams(
@@ -306,50 +463,88 @@ public class MainActivity extends Activity {
                 dp(8)
         );
 
-        root.addView(exit, params);
+        root.addView(
+                exit,
+                params
+        );
 
-        exit.setOnClickListener(v -> confirmExit());
+        exit.setOnClickListener(
+                v -> confirmExit()
+        );
     }
 
     private void confirmExit() {
 
         new AlertDialog.Builder(this)
-                .setTitle("الخروج من وذكر")
-                .setMessage("هل تريد إغلاق التطبيق؟")
+
+                .setTitle(
+                        "الخروج من وذكر"
+                )
+
+                .setMessage(
+                        "هل تريد إغلاق التطبيق؟"
+                )
+
                 .setPositiveButton(
                         "خروج",
-                        (dialog, which) -> finishAffinity()
+                        (dialog, which) ->
+                                finishAffinity()
                 )
+
                 .setNegativeButton(
                         "إلغاء",
                         null
                 )
+
                 .show();
     }
 
+    /*
+     * تحديث الحصيلة اليومية والتذكيرات
+     */
     private void refresh() {
 
         String d = today();
 
-        if (!d.equals(prefs.getString("date", ""))) {
+        if (!d.equals(
+                prefs.getString(
+                        "date",
+                        ""
+                )
+        )) {
 
             prefs.edit()
-                    .putString("date", d)
-                    .putInt("count", 0)
+                    .putString(
+                            "date",
+                            d
+                    )
+                    .putInt(
+                            "count",
+                            0
+                    )
                     .apply();
         }
 
         countText.setText(
                 String.valueOf(
-                        prefs.getInt("count", 0)
+                        prefs.getInt(
+                                "count",
+                                0
+                        )
                 )
         );
 
         boolean enabled =
-                prefs.getBoolean("enabled", false);
+                prefs.getBoolean(
+                        "enabled",
+                        false
+                );
 
         long minutes =
-                prefs.getLong("minutes", 30);
+                prefs.getLong(
+                        "minutes",
+                        30
+                );
 
         if (enabled) {
 
@@ -359,7 +554,9 @@ public class MainActivity extends Activity {
                             " دقيقة"
             );
 
-            statusText.setTextColor(GREEN);
+            statusText.setTextColor(
+                    GREEN
+            );
 
         } else {
 
@@ -367,12 +564,15 @@ public class MainActivity extends Activity {
                     "⚪ التذكيرات متوقفة"
             );
 
-            statusText.setTextColor(MUTED);
+            statusText.setTextColor(
+                    MUTED
+            );
         }
     }
 
     /*
-     * شاشة الأذكار الجديدة:
+     * شاشة مجموعة الأذكار
+     *
      * بطاقة واحدة فقط في كل مرة.
      */
     private void section(
@@ -383,16 +583,18 @@ public class MainActivity extends Activity {
         currentTitle = title;
         currentData = data;
         currentIndex = 0;
-
         currentRepeat = 0;
 
-        LinearLayout root = new LinearLayout(this);
+        LinearLayout root =
+                new LinearLayout(this);
 
         root.setOrientation(
                 LinearLayout.VERTICAL
         );
 
-        root.setBackgroundColor(BG);
+        root.setBackgroundColor(
+                BG
+        );
 
         root.setPadding(
                 dp(12),
@@ -405,6 +607,9 @@ public class MainActivity extends Activity {
                 View.LAYOUT_DIRECTION_RTL
         );
 
+        /*
+         * HEADER
+         */
         LinearLayout header =
                 new LinearLayout(this);
 
@@ -420,7 +625,9 @@ public class MainActivity extends Activity {
                         true
                 );
 
-        back.setGravity(Gravity.CENTER);
+        back.setGravity(
+                Gravity.CENTER
+        );
 
         back.setOnClickListener(
                 v -> showHome()
@@ -463,7 +670,9 @@ public class MainActivity extends Activity {
                         true
                 );
 
-        exit.setGravity(Gravity.CENTER);
+        exit.setGravity(
+                Gravity.CENTER
+        );
 
         exit.setOnClickListener(
                 v -> confirmExit()
@@ -479,6 +688,9 @@ public class MainActivity extends Activity {
 
         root.addView(header);
 
+        /*
+         * تعليمات
+         */
         TextView instruction =
                 label(
                         "اسحب يمينًا أو يسارًا للتنقل بين الأذكار",
@@ -500,6 +712,9 @@ public class MainActivity extends Activity {
 
         root.addView(instruction);
 
+        /*
+         * رقم البطاقة
+         */
         dhikrPositionText =
                 label(
                         "",
@@ -520,10 +735,14 @@ public class MainActivity extends Activity {
                 )
         );
 
+        /*
+         * حاوية البطاقة
+         */
         FrameLayout cardContainer =
                 new FrameLayout(this);
 
-        LinearLayout.LayoutParams containerParams =
+        LinearLayout.LayoutParams
+                containerParams =
                 new LinearLayout.LayoutParams(
                         -1,
                         0,
@@ -537,8 +756,13 @@ public class MainActivity extends Activity {
         ScrollView cardScroll =
                 new ScrollView(this);
 
-        cardScroll.setFillViewport(true);
-        cardScroll.setBackgroundColor(BG);
+        cardScroll.setFillViewport(
+                true
+        );
+
+        cardScroll.setBackgroundColor(
+                BG
+        );
 
         LinearLayout cardHolder =
                 new LinearLayout(this);
@@ -558,12 +782,21 @@ public class MainActivity extends Activity {
                 dp(8)
         );
 
-        cardScroll.addView(cardHolder);
+        cardScroll.addView(
+                cardHolder
+        );
 
-        cardContainer.addView(cardScroll);
+        cardContainer.addView(
+                cardScroll
+        );
 
-        root.addView(cardContainer);
+        root.addView(
+                cardContainer
+        );
 
+        /*
+         * أزرار التنقل
+         */
         LinearLayout navigation =
                 new LinearLayout(this);
 
@@ -581,14 +814,27 @@ public class MainActivity extends Activity {
         Button previous =
                 new Button(this);
 
-        previous.setText("‹  السابق");
-        previous.setTextColor(BG);
-        previous.setTextSize(15);
-        previous.setAllCaps(false);
+        previous.setText(
+                "‹  السابق"
+        );
+
+        previous.setTextColor(
+                BG
+        );
+
+        previous.setTextSize(
+                15
+        );
+
+        previous.setAllCaps(
+                false
+        );
+
         previous.setTypeface(
                 Typeface.DEFAULT,
                 Typeface.BOLD
         );
+
         previous.setBackgroundResource(
                 R.drawable.neon_button
         );
@@ -596,14 +842,27 @@ public class MainActivity extends Activity {
         Button next =
                 new Button(this);
 
-        next.setText("التالي  ›");
-        next.setTextColor(BG);
-        next.setTextSize(15);
-        next.setAllCaps(false);
+        next.setText(
+                "التالي  ›"
+        );
+
+        next.setTextColor(
+                BG
+        );
+
+        next.setTextSize(
+                15
+        );
+
+        next.setAllCaps(
+                false
+        );
+
         next.setTypeface(
                 Typeface.DEFAULT,
                 Typeface.BOLD
         );
+
         next.setBackgroundResource(
                 R.drawable.neon_button
         );
@@ -636,14 +895,29 @@ public class MainActivity extends Activity {
                 )
         );
 
-        root.addView(navigation);
+        root.addView(
+                navigation
+        );
 
+        /*
+         * السابق
+         */
         previous.setOnClickListener(v -> {
 
             if (currentIndex > 0) {
 
                 currentIndex--;
-                showCurrentDhikr(cardHolder);
+
+                currentRepeat = 0;
+
+                showCurrentDhikr(
+                        cardHolder
+                );
+
+                cardScroll.scrollTo(
+                        0,
+                        0
+                );
 
             } else {
 
@@ -655,12 +929,26 @@ public class MainActivity extends Activity {
             }
         });
 
+        /*
+         * التالي
+         */
         next.setOnClickListener(v -> {
 
-            if (currentIndex < currentData.length - 1) {
+            if (currentIndex <
+                    currentData.length - 1) {
 
                 currentIndex++;
-                showCurrentDhikr(cardHolder);
+
+                currentRepeat = 0;
+
+                showCurrentDhikr(
+                        cardHolder
+                );
+
+                cardScroll.scrollTo(
+                        0,
+                        0
+                );
 
             } else {
 
@@ -674,6 +962,10 @@ public class MainActivity extends Activity {
 
         /*
          * السحب الأفقي.
+         *
+         * نسمح بالتمرير العمودي داخل البطاقة،
+         * ولا نغيّر الذكر إلا عند وجود حركة
+         * أفقية واضحة.
          */
         cardContainer.setOnTouchListener(
                 (v, event) -> {
@@ -689,22 +981,35 @@ public class MainActivity extends Activity {
 
                         case MotionEvent.ACTION_UP:
 
-                            float dx =
+                            float deltaX =
                                     event.getX() - downX;
 
-                            float dy =
+                            float deltaY =
                                     event.getY() - downY;
 
-                            if (Math.abs(dx) > dp(70) &&
-                                    Math.abs(dx) > Math.abs(dy) * 1.2f) {
+                            if (Math.abs(deltaX) >
+                                    dp(70) &&
+                                    Math.abs(deltaX) >
+                                    Math.abs(deltaY) * 1.3f) {
 
-                                if (dx < 0) {
+                                if (deltaX < 0) {
 
                                     if (currentIndex <
                                             currentData.length - 1) {
 
                                         currentIndex++;
-                                        showCurrentDhikr(cardHolder);
+
+                                        currentRepeat = 0;
+
+                                        showCurrentDhikr(
+                                                cardHolder
+                                        );
+
+                                        cardScroll.scrollTo(
+                                                0,
+                                                0
+                                        );
+
                                     }
 
                                 } else {
@@ -712,7 +1017,17 @@ public class MainActivity extends Activity {
                                     if (currentIndex > 0) {
 
                                         currentIndex--;
-                                        showCurrentDhikr(cardHolder);
+
+                                        currentRepeat = 0;
+
+                                        showCurrentDhikr(
+                                                cardHolder
+                                        );
+
+                                        cardScroll.scrollTo(
+                                                0,
+                                                0
+                                        );
                                     }
                                 }
 
@@ -728,26 +1043,41 @@ public class MainActivity extends Activity {
 
         setContentView(root);
 
-        showCurrentDhikr(cardHolder);
+        showCurrentDhikr(
+                cardHolder
+        );
     }
 
+    /*
+     * عرض الذكر الحالي
+     */
     private void showCurrentDhikr(
             LinearLayout holder
     ) {
 
+        if (currentData == null ||
+                currentData.length == 0) {
+
+            return;
+        }
+
         holder.removeAllViews();
 
-        currentRepeat = 0;
-
-        DhikrData.Dhikr item =
+        DhikrData.Dhikr dhikr =
                 currentData[currentIndex];
 
+        /*
+         * تحديث المؤشر
+         */
         dhikrPositionText.setText(
                 (currentIndex + 1) +
                         " من " +
                         currentData.length
         );
 
+        /*
+         * البطاقة
+         */
         LinearLayout card =
                 new LinearLayout(this);
 
@@ -756,13 +1086,13 @@ public class MainActivity extends Activity {
         );
 
         card.setGravity(
-                Gravity.CENTER_HORIZONTAL
+                Gravity.CENTER
         );
 
         card.setPadding(
+                dp(18),
                 dp(20),
-                dp(22),
-                dp(20),
+                dp(18),
                 dp(20)
         );
 
@@ -774,19 +1104,32 @@ public class MainActivity extends Activity {
                 dp(8)
         );
 
-        holder.addView(
-                card,
+        LinearLayout.LayoutParams
+                cardParams =
                 new LinearLayout.LayoutParams(
                         -1,
                         -2
-                )
+                );
+
+        cardParams.setMargins(
+                dp(2),
+                dp(4),
+                dp(2),
+                dp(8)
         );
 
+        card.setLayoutParams(
+                cardParams
+        );
+
+        /*
+         * عنوان الذكر
+         */
         dhikrTitleText =
                 label(
-                        item.title,
+                        "✦  الذكر  ✦",
                         GREEN,
-                        24,
+                        17,
                         true
                 );
 
@@ -795,18 +1138,17 @@ public class MainActivity extends Activity {
         );
 
         card.addView(
-                dhikrTitleText,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        -2
-                )
+                dhikrTitleText
         );
 
+        /*
+         * نص الذكر
+         */
         dhikrBodyText =
                 label(
-                        item.text,
+                        dhikr.text,
                         WHITE,
-                        21,
+                        22,
                         false
                 );
 
@@ -816,49 +1158,67 @@ public class MainActivity extends Activity {
 
         dhikrBodyText.setLineSpacing(
                 dp(5),
-                1.18f
+                1.12f
         );
 
         dhikrBodyText.setPadding(
-                0,
-                dp(24),
-                0,
-                dp(20)
+                dp(3),
+                dp(18),
+                dp(3),
+                dp(14)
         );
 
         card.addView(
-                dhikrBodyText,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        -2
-                )
+                dhikrBodyText
         );
 
-        dhikrSourceText =
-                label(
-                        "المصدر: " + item.source,
-                        CYAN,
-                        12,
-                        false
+        /*
+         * المصدر إن وجد
+         */
+        if (dhikr.source != null &&
+                !dhikr.source.trim().isEmpty()) {
+
+            dhikrSourceText =
+                    label(
+                            "📚 " + dhikr.source,
+                            MUTED,
+                            12,
+                            false
+                    );
+
+            dhikrSourceText.setGravity(
+                    Gravity.CENTER
+            );
+
+            dhikrSourceText.setPadding(
+                    0,
+                    dp(2),
+                    0,
+                    dp(10)
+            );
+
+            card.addView(
+                    dhikrSourceText
+            );
+        }
+
+        /*
+         * عداد التكرار
+         */
+        int targetRepeat =
+                Math.max(
+                        1,
+                        dhikr.repeat
                 );
-
-        dhikrSourceText.setGravity(
-                Gravity.CENTER
-        );
-
-        card.addView(
-                dhikrSourceText,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        -2
-                )
-        );
 
         dhikrCounterText =
                 label(
-                        repeatText(0, item.count),
-                        PURPLE,
-                        17,
+                        progress(
+                                currentRepeat,
+                                targetRepeat
+                        ),
+                        CYAN,
+                        19,
                         true
                 );
 
@@ -866,31 +1226,34 @@ public class MainActivity extends Activity {
                 Gravity.CENTER
         );
 
-        dhikrCounterText.setPadding(
-                0,
-                dp(20),
-                0,
-                dp(12)
-        );
-
         card.addView(
-                dhikrCounterText,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        -2
-                )
+                dhikrCounterText
         );
 
+        /*
+         * زر التكرار
+         */
         dhikrActionButton =
                 new Button(this);
 
         dhikrActionButton.setText(
-                "📿  اضغط للذكر"
+                currentRepeat >= targetRepeat
+                        ? "✓  مكتمل"
+                        : "تسبيح / تكرار"
         );
 
-        dhikrActionButton.setTextColor(BG);
-        dhikrActionButton.setTextSize(17);
-        dhikrActionButton.setAllCaps(false);
+        dhikrActionButton.setTextColor(
+                BG
+        );
+
+        dhikrActionButton.setTextSize(
+                16
+        );
+
+        dhikrActionButton.setAllCaps(
+                false
+        );
+
         dhikrActionButton.setTypeface(
                 Typeface.DEFAULT,
                 Typeface.BOLD
@@ -900,258 +1263,304 @@ public class MainActivity extends Activity {
                 R.drawable.neon_button
         );
 
-        card.addView(
-                dhikrActionButton,
+        LinearLayout.LayoutParams
+                actionParams =
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(58)
-                )
+                        dp(56)
+                );
+
+        actionParams.setMargins(
+                dp(2),
+                dp(10),
+                dp(2),
+                0
+        );
+
+        card.addView(
+                dhikrActionButton,
+                actionParams
         );
 
         dhikrActionButton.setOnClickListener(
                 v -> {
 
-                    if (currentRepeat >= item.count) {
-                        return;
-                    }
+                    if (currentRepeat <
+                            targetRepeat) {
 
-                    currentRepeat++;
+                        currentRepeat++;
 
-                    recordDhikr(this);
-
-                    dhikrCounterText.setText(
-                            repeatText(
-                                    currentRepeat,
-                                    item.count
-                            )
-                    );
-
-                    if (currentRepeat >= item.count) {
-
-                        dhikrActionButton.setText(
-                                "✓  اكتمل الذكر"
+                        recordDhikr(
+                                this
                         );
 
-                        dhikrActionButton.setTextColor(
-                                WHITE
+                        dhikrCounterText.setText(
+                                progress(
+                                        currentRepeat,
+                                        targetRepeat
+                                )
                         );
 
-                        dhikrActionButton.setBackgroundColor(
-                                Color.rgb(18, 105, 68)
-                        );
+                        if (currentRepeat >=
+                                targetRepeat) {
 
-                        dhikrActionButton.setEnabled(
-                                false
-                        );
+                            dhikrActionButton.setText(
+                                    "✓  مكتمل"
+                            );
+
+                            Toast.makeText(
+                                    this,
+                                    "أحسنت، اكتمل الذكر",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+                        }
                     }
                 }
         );
 
-        /*
-         * إعادة التمرير إلى الأعلى عند تغيير الذكر.
-         */
-        holder.post(() -> {
-
-            View parent = holder.getParent();
-
-            if (parent instanceof ScrollView) {
-                ((ScrollView) parent).scrollTo(0, 0);
-            }
-        });
+        holder.addView(card);
     }
 
-    private String repeatText(
-            int current,
-            int total
-    ) {
-
-        if (total <= 0) {
-            return "✓";
-        }
-
-        StringBuilder dots =
-                new StringBuilder();
-
-        int visible =
-                Math.min(total, 20);
-
-        for (int i = 0; i < visible; i++) {
-
-            dots.append(
-                    i < current ? "● " : "○ "
-            );
-        }
-
-        if (total > 20) {
-            dots.append("...");
-        }
-
-        if (current >= total) {
-
-            return dots.toString() +
-                    "  ✓ مكتمل";
-        }
-
-        return dots.toString() +
-                "\n" +
-                current +
-                " / " +
-                total;
-    }
-
+    /*
+     * عداد التسبيح
+     */
     private void tasbeeh() {
 
-        final int[] q = {0};
+        final int[] value = {
+                prefs.getInt(
+                        "tasbeeh",
+                        0
+                )
+        };
 
-        LinearLayout box =
+        LinearLayout root =
                 new LinearLayout(this);
 
-        box.setOrientation(
+        root.setOrientation(
                 LinearLayout.VERTICAL
         );
 
-        box.setGravity(
+        root.setGravity(
                 Gravity.CENTER
         );
 
-        box.setPadding(
-                dp(24),
-                dp(12),
-                dp(24),
-                dp(6)
+        root.setPadding(
+                dp(20),
+                dp(15),
+                dp(20),
+                dp(20)
         );
 
-        box.setBackgroundColor(BG);
+        root.setBackgroundColor(
+                BG
+        );
 
-        TextView number =
+        TextView title =
                 label(
-                        "0",
+                        "📿  عداد التسبيح",
                         GREEN,
-                        54,
+                        26,
                         true
                 );
 
-        number.setGravity(
+        title.setGravity(
                 Gravity.CENTER
         );
 
-        box.addView(
-                number,
+        root.addView(
+                title,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(100)
+                        dp(65)
                 )
         );
 
-        Button action =
-                new Button(this);
+        TextView count =
+                label(
+                        String.valueOf(
+                                value[0]
+                        ),
+                        CYAN,
+                        64,
+                        true
+                );
 
-        action.setText(
-                "📿  سبحان الله"
+        count.setGravity(
+                Gravity.CENTER
         );
 
-        action.setTextColor(BG);
-        action.setTextSize(18);
-        action.setAllCaps(false);
-        action.setTypeface(
+        LinearLayout.LayoutParams
+                countParams =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        0,
+                        1
+                );
+
+        root.addView(
+                count,
+                countParams
+        );
+
+        Button add =
+                new Button(this);
+
+        add.setText(
+                "سبّح  +1"
+        );
+
+        add.setTextColor(
+                BG
+        );
+
+        add.setTextSize(
+                20
+        );
+
+        add.setAllCaps(
+                false
+        );
+
+        add.setTypeface(
                 Typeface.DEFAULT,
                 Typeface.BOLD
         );
 
-        action.setBackgroundResource(
+        add.setBackgroundResource(
                 R.drawable.neon_button
         );
 
-        action.setOnClickListener(
-                v -> {
-
-                    q[0]++;
-
-                    number.setText(
-                            String.valueOf(q[0])
-                    );
-
-                    recordDhikr(this);
-                }
-        );
-
-        box.addView(
-                action,
+        root.addView(
+                add,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(58)
+                        dp(62)
                 )
         );
 
-        new AlertDialog.Builder(this)
-                .setTitle("📿 عداد التسبيح")
-                .setView(box)
-                .setNegativeButton(
-                        "إغلاق",
-                        null
-                )
-                .show();
-    }
+        Button reset =
+                new Button(this);
 
-    private void settings() {
-
-        LinearLayout box =
-                new LinearLayout(this);
-
-        box.setOrientation(
-                LinearLayout.VERTICAL
+        reset.setText(
+                "إعادة العداد"
         );
 
-        box.setPadding(
-                dp(22),
+        reset.setTextColor(
+                RED
+        );
+
+        reset.setTextSize(
+                15
+        );
+
+        reset.setAllCaps(
+                false
+        );
+
+        reset.setBackgroundResource(
+                R.drawable.card_bg
+        );
+
+        LinearLayout.LayoutParams
+                resetParams =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(52)
+                );
+
+        resetParams.setMargins(
                 0,
-                dp(22),
+                dp(10),
+                0,
                 0
         );
 
-        Switch enabled =
-                new Switch(this);
-
-        enabled.setText(
-                "تفعيل رفيق الذكر"
+        root.addView(
+                reset,
+                resetParams
         );
 
-        enabled.setTextSize(17);
-
-        enabled.setChecked(
-                prefs.getBoolean(
-                        "enabled",
-                        false
-                )
-        );
-
-        box.addView(enabled);
-
-        TextView info =
+        TextView back =
                 label(
-                        "الفاصل: من 1 إلى 60 دقيقة (الافتراضي 30)",
+                        "‹  العودة للرئيسية",
                         MUTED,
-                        14,
-                        false
+                        15,
+                        true
                 );
 
-        info.setPadding(
-                0,
-                dp(12),
-                0,
-                dp(5)
+        back.setGravity(
+                Gravity.CENTER
         );
 
-        box.addView(info);
+        back.setPadding(
+                0,
+                dp(15),
+                0,
+                dp(8)
+        );
 
-        EditText minutes =
+        root.addView(back);
+
+        add.setOnClickListener(
+                v -> {
+
+                    value[0]++;
+
+                    count.setText(
+                            String.valueOf(
+                                    value[0]
+                            )
+                    );
+
+                    prefs.edit()
+                            .putInt(
+                                    "tasbeeh",
+                                    value[0]
+                            )
+                            .apply();
+                }
+        );
+
+        reset.setOnClickListener(
+                v -> {
+
+                    value[0] = 0;
+
+                    count.setText("0");
+
+                    prefs.edit()
+                            .putInt(
+                                    "tasbeeh",
+                                    0
+                            )
+                            .apply();
+                }
+        );
+
+        back.setOnClickListener(
+                v -> showHome()
+        );
+
+        setContentView(root);
+    }
+
+    /*
+     * الإعدادات
+     */
+    private void settings() {
+
+        final EditText input =
                 new EditText(this);
 
-        minutes.setInputType(
+        input.setInputType(
                 InputType.TYPE_CLASS_NUMBER
         );
 
-        minutes.setText(
+        input.setHint(
+                "مثال: 30"
+        );
+
+        input.setText(
                 String.valueOf(
                         prefs.getLong(
                                 "minutes",
@@ -1160,139 +1569,183 @@ public class MainActivity extends Activity {
                 )
         );
 
-        minutes.setTextSize(18);
-
-        box.addView(minutes);
+        input.setSelectAllOnFocus(
+                true
+        );
 
         new AlertDialog.Builder(this)
-                .setTitle("🔔 رفيق الذكر")
-                .setView(box)
+
+                .setTitle(
+                        "🔔 إعداد التذكيرات"
+                )
+
+                .setMessage(
+                        "حدد عدد الدقائق بين كل تذكير."
+                )
+
+                .setView(input)
+
                 .setPositiveButton(
                         "حفظ",
                         (dialog, which) -> {
 
-                            long value = 30;
-
                             try {
 
-                                value =
+                                long minutes =
                                         Long.parseLong(
-                                                minutes
-                                                        .getText()
+                                                input.getText()
                                                         .toString()
                                                         .trim()
                                         );
 
-                            } catch (Exception ignored) {
+                                if (minutes < 1) {
+                                    minutes = 1;
+                                }
+
+                                prefs.edit()
+                                        .putBoolean(
+                                                "enabled",
+                                                true
+                                        )
+                                        .putLong(
+                                                "minutes",
+                                                minutes
+                                        )
+                                        .apply();
+
+                                ReminderScheduler.schedule(
+                                        this,
+                                        minutes
+                                );
+
+                                refresh();
+
+                                Toast.makeText(
+                                        this,
+                                        "تم تفعيل التذكيرات",
+                                        Toast.LENGTH_SHORT
+                                ).show();
+
+                            } catch (Exception e) {
+
+                                Toast.makeText(
+                                        this,
+                                        "أدخل رقمًا صحيحًا",
+                                        Toast.LENGTH_SHORT
+                                ).show();
                             }
+                        }
+                )
 
-                            value =
-                                    Math.max(
-                                            1,
-                                            Math.min(
-                                                    60,
-                                                    value
-                                            )
-                                    );
-
-                            boolean on =
-                                    enabled.isChecked();
+                .setNeutralButton(
+                        "إيقاف",
+                        (dialog, which) -> {
 
                             prefs.edit()
                                     .putBoolean(
                                             "enabled",
-                                            on
-                                    )
-                                    .putLong(
-                                            "minutes",
-                                            value
+                                            false
                                     )
                                     .apply();
 
-                            if (on) {
-
-                                ReminderScheduler.schedule(
-                                        this,
-                                        value
-                                );
-
-                            } else {
-
-                                ReminderScheduler.cancel(
-                                        this
-                                );
-                            }
+                            ReminderScheduler.cancel(
+                                    this
+                            );
 
                             refresh();
                         }
                 )
+
                 .setNegativeButton(
                         "إلغاء",
                         null
                 )
+
                 .show();
     }
 
+    /*
+     * حول وذكر
+     */
     private void about() {
 
-        LinearLayout box =
+        LinearLayout root =
                 new LinearLayout(this);
 
-        box.setOrientation(
+        root.setOrientation(
                 LinearLayout.VERTICAL
         );
 
-        box.setGravity(
+        root.setGravity(
                 Gravity.CENTER
         );
 
-        box.setPadding(
-                dp(22),
-                dp(5),
-                dp(22),
-                dp(5)
+        root.setPadding(
+                dp(24),
+                dp(18),
+                dp(24),
+                dp(18)
         );
 
-        TextView name =
+        root.setBackgroundColor(
+                BG
+        );
+
+        ImageView icon =
+                new ImageView(this);
+
+        icon.setImageResource(
+                R.drawable.icon_source
+        );
+
+        root.addView(
+                icon,
+                new LinearLayout.LayoutParams(
+                        dp(100),
+                        dp(100)
+                )
+        );
+
+        TextView title =
                 label(
-                        "وذكر 2.1.0",
+                        "وذكر",
                         GREEN,
-                        27,
+                        32,
                         true
                 );
 
-        name.setGravity(
+        title.setGravity(
                 Gravity.CENTER
         );
 
-        box.addView(name);
+        root.addView(title);
 
-        TextView description =
+        TextView version =
                 label(
-                        "تطبيق إسلامي للأذكار والأدعية والتسبيح، صُمم ليكون سريعًا وواضحًا ومريحًا للاستخدام اليومي.",
-                        WHITE,
-                        16,
+                        "الإصدار 2.0.0",
+                        CYAN,
+                        14,
                         false
                 );
 
-        description.setGravity(
+        version.setGravity(
                 Gravity.CENTER
         );
 
-        description.setPadding(
+        version.setPadding(
                 0,
-                dp(12),
+                dp(4),
                 0,
-                dp(12)
+                dp(20)
         );
 
-        box.addView(description);
+        root.addView(version);
 
         TextView developer =
                 label(
-                        "المطور: صالح الخليفي",
-                        CYAN,
-                        16,
+                        "المطور\nصالح الخليفي",
+                        WHITE,
+                        18,
                         true
                 );
 
@@ -1300,13 +1753,15 @@ public class MainActivity extends Activity {
                 Gravity.CENTER
         );
 
-        box.addView(developer);
+        root.addView(
+                developer
+        );
 
         TextView telegram =
                 label(
-                        "Telegram: @iSx3i",
-                        GREEN,
-                        17,
+                        "✈️  @iSx3i",
+                        CYAN,
+                        18,
                         true
                 );
 
@@ -1316,9 +1771,13 @@ public class MainActivity extends Activity {
 
         telegram.setPadding(
                 0,
-                dp(16),
+                dp(20),
                 0,
-                dp(5)
+                dp(20)
+        );
+
+        root.addView(
+                telegram
         );
 
         telegram.setOnClickListener(
@@ -1326,95 +1785,147 @@ public class MainActivity extends Activity {
 
                     try {
 
-                        startActivity(
+                        Intent intent =
                                 new Intent(
                                         Intent.ACTION_VIEW,
                                         Uri.parse(
                                                 "https://t.me/iSx3i"
                                         )
-                                )
-                        );
+                                );
+
+                        startActivity(intent);
 
                     } catch (Exception ignored) {
                     }
                 }
         );
 
-        box.addView(telegram);
+        Button back =
+                new Button(this);
 
-        new AlertDialog.Builder(this)
-                .setTitle("ℹ️ حول وذكر")
-                .setView(box)
-                .setPositiveButton(
-                        "تم",
-                        null
+        back.setText(
+                "‹  العودة للرئيسية"
+        );
+
+        back.setTextColor(
+                BG
+        );
+
+        back.setTextSize(
+                16
+        );
+
+        back.setAllCaps(
+                false
+        );
+
+        back.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+        );
+
+        back.setBackgroundResource(
+                R.drawable.neon_button
+        );
+
+        root.addView(
+                back,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(56)
                 )
-                .show();
+        );
+
+        back.setOnClickListener(
+                v -> showHome()
+        );
+
+        setContentView(root);
     }
 
+    /*
+     * زر الرجوع في أندرويد
+     */
     @Override
     public void onBackPressed() {
 
         if (currentData != null) {
 
-            currentData = null;
-            currentIndex = 0;
-            currentRepeat = 0;
-
             showHome();
 
-        } else {
-
-            new AlertDialog.Builder(this)
-                    .setTitle("الخروج من وذكر")
-                    .setMessage(
-                            "هل تريد الخروج من التطبيق؟"
-                    )
-                    .setPositiveButton(
-                            "خروج",
-                            (dialog, which) ->
-                                    finishAffinity()
-                    )
-                    .setNegativeButton(
-                            "إلغاء",
-                            null
-                    )
-                    .show();
+            return;
         }
+
+        confirmExit();
     }
 
-    public static void recordDhikr(Context context) {
+    /*
+     * تسجيل ذكر مكتمل في الحصيلة اليومية
+     */
+    public static void recordDhikr(
+            Context context
+    ) {
 
         SharedPreferences p =
                 context.getSharedPreferences(
                         "settings",
-                        MODE_PRIVATE
+                        Context.MODE_PRIVATE
                 );
 
-        String date =
+        String today =
                 new SimpleDateFormat(
                         "yyyy-MM-dd",
                         Locale.US
-                ).format(new Date());
+                ).format(
+                        new Date()
+                );
 
-        if (!date.equals(
-                p.getString("date", "")
-        )) {
+        String savedDate =
+                p.getString(
+                        "date",
+                        ""
+                );
 
-            p.edit()
-                    .putString("date", date)
-                    .putInt("count", 0)
-                    .apply();
+        int count =
+                p.getInt(
+                        "count",
+                        0
+                );
+
+        if (!today.equals(savedDate)) {
+
+            count = 0;
         }
 
         p.edit()
+                .putString(
+                        "date",
+                        today
+                )
                 .putInt(
                         "count",
-                        p.getInt("count", 0) + 1
+                        count + 1
                 )
                 .apply();
     }
 
+    /*
+     * تنسيق تقدم التكرار
+     */
+    private String progress(
+            int current,
+            int target
+    ) {
+
+        return "التكرار  " +
+                current +
+                " / " +
+                target;
+    }
+
+    /*
+     * إنشاء TextView موحد
+     */
     private TextView label(
             String text,
             int color,
@@ -1422,45 +1933,54 @@ public class MainActivity extends Activity {
             boolean bold
     ) {
 
-        TextView view =
+        TextView t =
                 new TextView(this);
 
-        view.setText(text);
-        view.setTextColor(color);
-        view.setTextSize(size);
-        view.setGravity(Gravity.RIGHT);
+        t.setText(text);
 
-        view.setLayoutDirection(
-                View.LAYOUT_DIRECTION_RTL
+        t.setTextColor(color);
+
+        t.setTextSize(size);
+
+        t.setGravity(
+                Gravity.CENTER_VERTICAL
         );
 
-        if (bold) {
+        t.setTypeface(
+                Typeface.DEFAULT,
+                bold
+                        ? Typeface.BOLD
+                        : Typeface.NORMAL
+        );
 
-            view.setTypeface(
-                    Typeface.DEFAULT,
-                    Typeface.BOLD
-            );
-        }
+        t.setIncludeFontPadding(true);
 
-        return view;
+        return t;
     }
 
+    /*
+     * تحويل dp إلى px
+     */
+    private int dp(int value) {
+
+        return Math.round(
+                value *
+                        getResources()
+                                .getDisplayMetrics()
+                                .density
+        );
+    }
+
+    /*
+     * تاريخ اليوم
+     */
     private String today() {
 
         return new SimpleDateFormat(
                 "yyyy-MM-dd",
                 Locale.US
-        ).format(new Date());
-    }
-
-    private int dp(int value) {
-
-        return (int) (
-                value *
-                        getResources()
-                                .getDisplayMetrics()
-                                .density +
-                        0.5f
+        ).format(
+                new Date()
         );
     }
 }
